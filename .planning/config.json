@@ -1,0 +1,15 @@
+{
+  "project_name": "Smart Hibernator",
+  "stack": {
+    "framework": "React 19",
+    "build_tool": "Vite",
+    "language": "TypeScript",
+    "css": "Tailwind CSS",
+    "ai_engine": "ONNX Runtime Web"
+  },
+  "workflow": {
+    "auto_mode": true,
+    "gsd_version": "1.0"
+  },
+  "targets": ["Chrome", "Edge"]
+}
