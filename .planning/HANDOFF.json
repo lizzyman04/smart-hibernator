@@ -1,0 +1,60 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-28T20:20:35Z",
+  "phase": "1",
+  "phase_name": "Core Hibernation Engine",
+  "phase_dir": ".planning/phases/01-core-hibernation-engine",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "stage": "planning",
+  "notes": "Phase 1 planning is in progress. 4 PLAN.md files created. Plan checker ran and found 6 blockers; 4 have been fixed. 2-3 remain before plans are ready for /gsd-execute-phase.",
+  "completed_tasks": [
+    {"id": 1, "name": "Create Plan 01 (Wave 0 scaffold)", "status": "done"},
+    {"id": 2, "name": "Create Plan 02 (Wave 1 hibernation loop)", "status": "done"},
+    {"id": 3, "name": "Create Plan 03 (Wave 2 popup UI)", "status": "done"},
+    {"id": 4, "name": "Create Plan 04 (Wave 3 tests)", "status": "done"},
+    {"id": 5, "name": "Run plan checker — 6 blockers found", "status": "done"},
+    {"id": 6, "name": "Fix blocker: ensureHibernateAlarm at module top level (Plan 01 Pitfall 1)", "status": "done"},
+    {"id": 7, "name": "Fix blocker: FR-04 tests no longer have it.skip escape hatch (Plan 04)", "status": "done"}
+  ],
+  "remaining_tasks": [
+    {"id": 8, "name": "Fix Plan 04 task 2: add web-ext lint for NFR-06 automated gate; remove E2E bail-out paragraph", "status": "not_started"},
+    {"id": 9, "name": "Fix Plan 03 objective: document resolution of UI-SPEC §6 vs. Copywriting Contract contradiction", "status": "not_started"},
+    {"id": 10, "name": "Update RESEARCH.md: change '## Open Questions' to '## Open Questions (RESOLVED)' with documented resolutions for all 3 questions", "status": "not_started"},
+    {"id": 11, "name": "Re-run /gsd-plan-phase 01 to trigger plan checker again and confirm all blockers fixed", "status": "not_started"},
+    {"id": 12, "name": "Update STATE.md status to READY_TO_EXECUTE after checker passes", "status": "not_started"}
+  ],
+  "blockers": [
+    {
+      "description": "Plan checker found 2 remaining blockers: (1) NFR-06 E2E can be fully skipped with no automated fallback; (2) UI-SPEC §6 contradiction silently adopted",
+      "type": "technical",
+      "workaround": "Fix Plan 04 task 2 and Plan 03 objective per instructions in remaining_tasks"
+    },
+    {
+      "description": "RESEARCH.md ## Open Questions section not marked (RESOLVED)",
+      "type": "technical",
+      "workaround": "Update section heading and add resolution notes for each of the 3 open questions"
+    }
+  ],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "4-plan structure for Phase 1", "rationale": "Wave 0 scaffold → Wave 1 hibernation loop → Wave 2 popup UI → Wave 3 tests", "phase": "1"},
+    {"decision": "FR-04 tests use direct handleManualHibernate() testing", "rationale": "Avoids vitest-chrome callListeners API compatibility risk; reliable, no escape hatch", "phase": "1"},
+    {"decision": "Zero-state count display uses 'No tabs hibernated' prose", "rationale": "Adopts Copywriting Contract version over UI-SPEC §6 Component Spec; more user-friendly", "phase": "1"},
+    {"decision": "ensureHibernateAlarm() called at module top level in index.ts", "rationale": "RESEARCH.md Pitfall 1 — must run on every SW restart, not just onInstalled", "phase": "1"}
+  ],
+  "uncommitted_files": [
+    ".planning/phases/01-core-hibernation-engine/01-01-PLAN.md",
+    ".planning/phases/01-core-hibernation-engine/01-02-PLAN.md",
+    ".planning/phases/01-core-hibernation-engine/01-03-PLAN.md",
+    ".planning/phases/01-core-hibernation-engine/01-04-PLAN.md",
+    ".planning/phases/01-core-hibernation-engine/01-RESEARCH.md",
+    ".planning/phases/01-core-hibernation-engine/01-UI-SPEC.md",
+    ".planning/phases/01-core-hibernation-engine/01-VALIDATION.md",
+    ".planning/STATE.md"
+  ],
+  "next_action": "Fix Plan 04 task 2 (NFR-06 web-ext lint), fix Plan 03 objective (UI-SPEC contradiction note), update RESEARCH.md open questions, then re-run /gsd-plan-phase 01 to verify checker passes",
+  "context_notes": "Plans 01-04 are substantively complete and correct. The remaining 2-3 checker blockers are documentation-level fixes (adding a note, changing a section heading, removing a bail-out paragraph) — not architectural changes. Once fixed, the checker should pass and execution can begin."
+}
