@@ -690,22 +690,25 @@ export default defineConfig({
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **CRXJS + Vite 8 peer compatibility**
    - What we know: CRXJS 2.4.0 has `rollup: 2.79.2` bundled as a direct dependency (not peer), which may conflict with Vite 8's bundled Rollup
    - What's unclear: Whether CRXJS 2.4.0 is officially tested with Vite 8.0.x (vs Vite 5/6)
    - Recommendation: Test install during Wave 0 (scaffold task). If peer conflict, pin to `vite@6` which is confirmed compatible with CRXJS 2.x. The CRXJS GitHub issues list may have reports.
+   - **RESOLVED:** Pin to `vite@6` in the Wave 0 scaffold plan (Plan 01-01). CRXJS 2.x is confirmed compatible with Vite 6; Vite 8 peer conflict risk is avoided by explicit version pin in package.json.
 
 2. **`chrome.tabs.discard()` on tabs with `autoDiscardable: false`**
    - What we know: `tab.autoDiscardable` is a property; `false` means the browser won't auto-discard, but extension-initiated discard should still work
    - What's unclear: Whether extension-called `chrome.tabs.discard()` respects `autoDiscardable: false`
    - Recommendation: Do NOT add `autoDiscardable` as a guard. Extension-initiated discard overrides browser's auto-discard setting per API intent.
+   - **RESOLVED:** No guard added. Extension-initiated `chrome.tabs.discard()` overrides `autoDiscardable: false` per the Chrome Extensions API spec. This is reflected in `hibernation.ts` — no `autoDiscardable` check in `isDiscardable()`.
 
 3. **CRXJS v2 HMR for popup with React 19**
    - What we know: CRXJS provides React HMR for popup; React 19 changed the root API (createRoot)
    - What's unclear: Any CRXJS-specific issues with React 19 fast refresh
    - Recommendation: If HMR breaks popup, standard workaround is manual extension reload. Functional correctness is not affected.
+   - **RESOLVED:** HMR is a developer-experience concern only; functional correctness is unaffected. If fast refresh breaks, the fallback is manual extension reload in `chrome://extensions`. No code changes required — Plan 01-01 proceeds with React 19 as specified.
 
 ---
 

@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-04-28T20:19:26.737Z"
+status: ready_to_execute
+last_updated: "2026-04-29T00:00:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 0
@@ -17,14 +17,14 @@ progress:
 ## Project Reference
 
 **Core Value**: A privacy-first, AI-powered Chrome extension that intelligently suspends inactive tabs to save RAM and battery.
-**Current Focus**: Initial Roadmap Creation
-**Success Definition**: Successful transition from requirements to an executable phased plan.
+**Current Focus**: Phase 1 — Core Hibernation Engine
+**Success Definition**: MV3 extension installs, hibernates tabs after 45 min, popup works, unit + E2E tests pass.
 
 ## Current Position
 
 **Phase**: 1 (Core Hibernation Engine)
-**Plan**: Context gathered — ready for planning
-**Status**: READY_TO_PLAN
+**Plan**: 4 plans verified — ready to execute
+**Status**: READY_TO_EXECUTE
 **Progress**: [░░░░░░░░░░░░░░░░░░░░] 0%
 
 ## Performance Metrics
@@ -32,21 +32,26 @@ progress:
 - **Total Requirements**: 20
 - **Requirements Mapped**: 20 (100%)
 - **Phases Defined**: 5
-- **Next Milestone**: Phase 1 Initiation
+- **Plans in Phase 1**: 4 (01-01 through 01-04, all checker-verified)
+- **Next Milestone**: Phase 1 Execution
 
 ## Accumulated Context
 
 ### Key Decisions
 
-- **Stack Selection**: React 19 + Vite + CRXJS + TypeScript + Tailwind CSS (per requirements).
-- **Inference Strategy**: ONNX Runtime Web in an Offscreen Document to bypass Service Worker limitations.
-- **Hibernation Strategy**: Native `chrome.tabs.discard()` to avoid URL redirection pitfalls.
+- **Stack Selection**: React 19 + Vite 6 + CRXJS 2.x + TypeScript + Tailwind CSS + shadcn/ui.
+- **Hibernation Strategy**: Native `chrome.tabs.discard()` — no URL redirection pitfall.
+- **Inference Strategy**: ONNX Runtime Web in an Offscreen Document (Phase 3, deferred).
+- **Timeout**: 45 min hardcoded (`TIMEOUT_MS = 45 * 60 * 1000`).
+- **Form Protection**: 5 min expiry after last input activity (`FORM_PROTECTION_MS = 5 * 60 * 1000`).
+- **Tab Group Protection**: Deferred to Phase 2.
+- **Popup Architecture**: Popup calls `chrome.tabs.discard()` directly (documented deviation from Responsibility Map — acceptable for Phase 1).
+- **Zero-state display**: "No tabs hibernated" prose (Copywriting Contract adopted over UI-SPEC §6 numeric `0`).
 
 ### Todos
 
 - [ ] Initialize project repository with Vite + React + TypeScript.
 - [ ] Configure CRXJS for Manifest V3.
-- [ ] Create Phase 1 detailed plan.
 
 ### Blockers
 
@@ -54,6 +59,6 @@ progress:
 
 ## Session Continuity
 
-**Last Session**: Phase 1 context gathered via /gsd-discuss-phase. Key decisions: 45 min hardcoded timeout, global on/off toggle, minimal branded popup with per-tab protection + badge count, input-activity heuristic for form detection (5 min expiry), Tab Group protection deferred to Phase 2.
-**Next Session**: Phase 1 planning — run /gsd-plan-phase 01
-**Resume file**: .planning/phases/01-core-hibernation-engine/01-CONTEXT.md
+**Last Session**: 2026-04-29 — Phase 1 plan checker passed (0 blockers, 2 warnings resolved). Plans 01-01 through 01-04 are verified and ready.
+**Next Session**: Execute Phase 1 — run `/gsd-execute-phase 01`
+**Resume file**: .planning/phases/01-core-hibernation-engine/01-01-PLAN.md
