@@ -2,7 +2,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Core Hibernation Engine** - Establish MV3 foundation and reliable heuristic-based tab discarding.
+- [x] **Phase 1: Core Hibernation Engine** - Establish MV3 foundation and reliable heuristic-based tab discarding.
 - [ ] **Phase 2: UI & Rich Previews** - Visual feedback, thumbnails, and central savings dashboard.
 - [ ] **Phase 3: AI Intelligence** - Local ONNX-based tab vitality classification and dynamic timeouts.
 - [ ] **Phase 4: Perfect State Restoration** - Seamless wake-up with preserved scroll and form state.
@@ -69,7 +69,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Hibernation Engine | 3/4 | In progress | 01-01, 01-02, 01-03 done (2026-04-30) |
+| 1. Core Hibernation Engine | 4/4 | Complete | 01-01, 01-02, 01-03, 01-04 done (2026-04-30) |
 | 2. UI & Rich Previews | 0/1 | Not started | - |
 | 3. AI Intelligence | 0/1 | Not started | - |
 | 4. Perfect State Restoration | 0/1 | Not started | - |
