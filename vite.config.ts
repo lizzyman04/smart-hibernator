@@ -5,10 +5,16 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { crx } from '@crxjs/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
+import { resolve } from 'path'
 import manifest from './manifest.json'
 
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), crx({ manifest })],
   build: { assetsInlineLimit: 0 },
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, 'src'),
+    },
+  },
 })

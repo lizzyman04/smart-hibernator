@@ -12,6 +12,7 @@
     "allowImportingTsExtensions": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/*"],
       "@shared/*": ["src/shared/*"],
       "@background/*": ["src/background/*"],
       "@popup/*": ["src/popup/*"],
