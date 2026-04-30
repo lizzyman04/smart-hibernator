@@ -1,5 +1,6 @@
 import type { TabMeta } from '../shared/types'
 import { TIMEOUT_MS, FORM_PROTECTION_MS } from '../shared/constants'
+import { updateBadge } from './badge'
 
 export function isDiscardable(
   tab: chrome.tabs.Tab,
@@ -29,9 +30,62 @@ export function isDiscardable(
 }
 
 export async function handleAlarmTick(): Promise<void> {
-  // Implemented in Wave 1 Plan 02
+  // Read all required state in a single storage.get call for atomicity
+  const result = await chrome.storage.local.get([
+    'hibernation_enabled',
+    'tab_meta',
+    'protected_tabs',
+    'protected_domains',
+    'hibernated_count',
+  ])
+
+  const hibernationEnabled = (result['hibernation_enabled'] as boolean) ?? true
+  if (!hibernationEnabled) return
+
+  const tabMeta = (result['tab_meta'] as Record<number, TabMeta>) ?? {}
+  const protectedTabs = (result['protected_tabs'] as number[]) ?? []
+  const protectedDomains = (result['protected_domains'] as string[]) ?? []
+  let hibernatedCount = (result['hibernated_count'] as number) ?? 0
+
+  // Query ALL tabs — isDiscardable handles URL/state filtering
+  const tabs = await chrome.tabs.query({})
+  const now = Date.now()
+
+  let newDiscards = 0
+
+  for (const tab of tabs) {
+    if (!tab.id) continue
+    const meta = tabMeta[tab.id]
+    if (!isDiscardable(tab, meta, now, protectedTabs, protectedDomains)) continue
+
+    try {
+      const discarded = await chrome.tabs.discard(tab.id)
+      // discard() returns undefined when the tab cannot be discarded (already discarded, active, protected)
+      if (discarded !== undefined) {
+        newDiscards++
+      }
+    } catch {
+      // Tab may have been closed between query and discard — silently continue
+    }
+  }
+
+  if (newDiscards > 0) {
+    hibernatedCount += newDiscards
+    await chrome.storage.local.set({ hibernated_count: hibernatedCount })
+    await updateBadge(hibernatedCount)
+  }
 }
 
 export async function handleManualHibernate(tabId: number): Promise<void> {
-  await chrome.tabs.discard(tabId)
+  try {
+    const discarded = await chrome.tabs.discard(tabId)
+    if (discarded !== undefined) {
+      const result = await chrome.storage.local.get('hibernated_count')
+      const count = ((result['hibernated_count'] as number) ?? 0) + 1
+      await chrome.storage.local.set({ hibernated_count: count })
+      await updateBadge(count)
+    }
+  } catch {
+    // Tab closed or not discardable — ignore
+  }
 }
