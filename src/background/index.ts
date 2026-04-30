@@ -1,0 +1,87 @@
+// Service Worker entry point
+// CRITICAL: ALL listeners registered synchronously at module top level
+// Do NOT move any listener registration inside async callbacks
+import { handleAlarmTick, handleManualHibernate } from './hibernation'
+import { createContextMenus } from './contextMenus'
+import { ensureHibernateAlarm } from './alarms'
+import { ALARM_NAME } from '../shared/constants'
+
+// IMPORTANT: Call ensureHibernateAlarm() at module top level so it runs on
+// EVERY SW restart, not just on install events. This prevents hibernation from
+// silently stopping if the alarm is ever cleared (RESEARCH.md Pitfall 1).
+ensureHibernateAlarm()
+
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === 'install' || reason === 'update') {
+    createContextMenus()
+    chrome.storage.local.set({
+      hibernation_enabled: true,
+      hibernated_count: 0,
+      tab_meta: {},
+      protected_tabs: [],
+      protected_domains: [],
+    })
+    // Also call ensureHibernateAlarm() here for idempotency on install/update
+    ensureHibernateAlarm()
+  }
+})
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === ALARM_NAME) {
+    handleAlarmTick()
+  }
+})
+
+chrome.tabs.onActivated.addListener(({ tabId }) => {
+  chrome.storage.local.get('tab_meta', (result) => {
+    const tab_meta = (result.tab_meta as Record<number, { lastActiveAt: number; lastFormActivity?: number }>) || {}
+    tab_meta[tabId] = { ...tab_meta[tabId], lastActiveAt: Date.now() }
+    chrome.storage.local.set({ tab_meta })
+  })
+})
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.local.get('tab_meta', (result) => {
+    const tab_meta = (result.tab_meta as Record<number, unknown>) || {}
+    delete tab_meta[tabId]
+    chrome.storage.local.set({ tab_meta })
+  })
+})
+
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (message.type === 'FORM_ACTIVITY' && sender.tab?.id) {
+    const tabId = sender.tab.id
+    chrome.storage.local.get('tab_meta', (result) => {
+      const tab_meta = (result.tab_meta as Record<number, { lastActiveAt: number; lastFormActivity?: number }>) || {}
+      tab_meta[tabId] = { ...tab_meta[tabId], lastFormActivity: message.timestamp as number }
+      chrome.storage.local.set({ tab_meta })
+    })
+  }
+})
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === 'hibernate-tab' && tab?.id) {
+    handleManualHibernate(tab.id)
+  }
+  if (info.menuItemId === 'protect-tab' && tab?.id) {
+    // Toggle protection for this tab — popup handles primary UI; context menu convenience shortcut
+    chrome.storage.local.get('protected_tabs', (result) => {
+      const protected_tabs: number[] = (result.protected_tabs as number[]) || []
+      const idx = protected_tabs.indexOf(tab.id!)
+      if (idx === -1) {
+        protected_tabs.push(tab.id!)
+      } else {
+        protected_tabs.splice(idx, 1)
+      }
+      chrome.storage.local.set({ protected_tabs })
+    })
+  }
+})
+
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'hibernate-current-tab') {
+    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+      if (tab?.id) handleManualHibernate(tab.id)
+    })
+  }
+})
