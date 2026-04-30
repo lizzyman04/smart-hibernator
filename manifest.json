@@ -20,8 +20,7 @@
     {
       "matches": ["<all_urls>"],
       "js": ["src/content/form-watcher.ts"],
-      "run_at": "document_idle",
-      "exclude_matches": ["chrome://*/*", "chrome-extension://*/*"]
+      "run_at": "document_idle"
     }
   ],
   "commands": {
