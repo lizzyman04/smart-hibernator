@@ -23,9 +23,9 @@ progress:
 ## Current Position
 
 **Phase**: 1 (Core Hibernation Engine)
-**Plan**: 01-02 (next to execute — Wave 1 Hibernation Logic)
+**Plan**: 01-03 (next to execute — Wave 2)
 **Status**: IN_PROGRESS
-**Progress**: [████░░░░░░░░░░░░░░░░] 25%
+**Progress**: [████████░░░░░░░░░░░░] 50%
 
 ## Performance Metrics
 
@@ -35,6 +35,7 @@ progress:
 - **Plans in Phase 1**: 4 (01-01 through 01-04, all checker-verified)
 - **Next Milestone**: Phase 1 Completion
 - **01-01 Duration**: 738s | Tasks: 4/4 | Files: 34 created, 2 modified
+- **01-02 Duration**: 76s | Tasks: 1/1 | Files: 0 created, 1 modified
 
 ## Accumulated Context
 
@@ -47,6 +48,8 @@ progress:
 - **Form Protection**: 5 min expiry after last input activity (`FORM_PROTECTION_MS = 5 * 60 * 1000`).
 - **Tab Group Protection**: Deferred to Phase 2.
 - **Popup Architecture**: Popup calls `chrome.tabs.discard()` directly (documented deviation from Responsibility Map — acceptable for Phase 1).
+- **Alarm tick storage read**: Single `chrome.storage.local.get([...])` call reads all 5 keys atomically to minimize race window (Pitfall 2 mitigation).
+- **Discard counting**: Only non-undefined returns from `chrome.tabs.discard()` increment `hibernated_count` — Chrome returns undefined for no-op discards.
 - **Zero-state display**: "No tabs hibernated" prose (Copywriting Contract adopted over UI-SPEC §6 numeric `0`).
 - **vitest-chrome ESM workaround**: `import from 'vitest-chrome/lib/index.esm.js'` (CJS entry incompatible with vitest 4.x).
 - **@types/react-dom version**: 19.2.3 used (19.2.5 does not exist on npm registry).
@@ -63,6 +66,6 @@ progress:
 
 ## Session Continuity
 
-**Last Session**: 2026-04-30 — Plan 01-01 (Project Scaffold) executed completely. 4/4 tasks done, 13/13 unit tests pass, vite build exits 0.
-**Next Session**: Execute Plan 01-02 — Wave 1 Hibernation Logic
-**Resume file**: .planning/phases/01-core-hibernation-engine/01-02-PLAN.md
+**Last Session**: 2026-04-30 — Plan 01-02 (Background Service Worker — Alarm Loop) executed completely. 1/1 tasks done, 13/13 unit tests pass, vite build exits 0.
+**Next Session**: Execute Plan 01-03 — Wave 2
+**Resume file**: .planning/phases/01-core-hibernation-engine/01-03-PLAN.md
