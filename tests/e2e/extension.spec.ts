@@ -33,11 +33,24 @@ test.describe('Smart Hibernator MV3 Extension', () => {
     context,
     extensionId,
   }) => {
-    // Evaluate storage state via a new page in the extension's context
+    // Evaluate storage state via a new page in the extension's context.
+    // Poll until hibernation_enabled is set — onInstalled fires async after SW starts,
+    // so we must wait rather than read immediately after domcontentloaded.
     const page = await context.newPage()
     await page.goto(`chrome-extension://${extensionId}/src/popup/index.html`, {
       waitUntil: 'domcontentloaded',
     })
+
+    // Wait up to 5 seconds for onInstalled to complete storage initialization
+    await page.waitForFunction(
+      () =>
+        new Promise<boolean>((resolve) => {
+          chrome.storage.local.get('hibernation_enabled', (result) => {
+            resolve(result['hibernation_enabled'] !== undefined)
+          })
+        }),
+      { timeout: 5000 }
+    )
 
     const storageState = await page.evaluate(() => {
       return new Promise<Record<string, unknown>>((resolve) => {
