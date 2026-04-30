@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_execute
-last_updated: "2026-04-29T00:00:00.000Z"
+status: in_progress
+last_updated: "2026-04-30T00:00:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 0
@@ -23,9 +23,9 @@ progress:
 ## Current Position
 
 **Phase**: 1 (Core Hibernation Engine)
-**Plan**: 4 plans verified — ready to execute
-**Status**: READY_TO_EXECUTE
-**Progress**: [░░░░░░░░░░░░░░░░░░░░] 0%
+**Plan**: 01-02 (next to execute — Wave 1 Hibernation Logic)
+**Status**: IN_PROGRESS
+**Progress**: [████░░░░░░░░░░░░░░░░] 25%
 
 ## Performance Metrics
 
@@ -33,13 +33,14 @@ progress:
 - **Requirements Mapped**: 20 (100%)
 - **Phases Defined**: 5
 - **Plans in Phase 1**: 4 (01-01 through 01-04, all checker-verified)
-- **Next Milestone**: Phase 1 Execution
+- **Next Milestone**: Phase 1 Completion
+- **01-01 Duration**: 738s | Tasks: 4/4 | Files: 34 created, 2 modified
 
 ## Accumulated Context
 
 ### Key Decisions
 
-- **Stack Selection**: React 19 + Vite 6 + CRXJS 2.x + TypeScript + Tailwind CSS + shadcn/ui.
+- **Stack Selection**: React 19 + Vite 8 + CRXJS 2.x + TypeScript + Tailwind CSS + shadcn/ui.
 - **Hibernation Strategy**: Native `chrome.tabs.discard()` — no URL redirection pitfall.
 - **Inference Strategy**: ONNX Runtime Web in an Offscreen Document (Phase 3, deferred).
 - **Timeout**: 45 min hardcoded (`TIMEOUT_MS = 45 * 60 * 1000`).
@@ -47,6 +48,9 @@ progress:
 - **Tab Group Protection**: Deferred to Phase 2.
 - **Popup Architecture**: Popup calls `chrome.tabs.discard()` directly (documented deviation from Responsibility Map — acceptable for Phase 1).
 - **Zero-state display**: "No tabs hibernated" prose (Copywriting Contract adopted over UI-SPEC §6 numeric `0`).
+- **vitest-chrome ESM workaround**: `import from 'vitest-chrome/lib/index.esm.js'` (CJS entry incompatible with vitest 4.x).
+- **@types/react-dom version**: 19.2.3 used (19.2.5 does not exist on npm registry).
+- **shadcn style override**: Default/gray overrides shadcn's auto-selected base-nova style to match UI-SPEC.
 
 ### Todos
 
@@ -59,6 +63,6 @@ progress:
 
 ## Session Continuity
 
-**Last Session**: 2026-04-29 — Phase 1 plan checker passed (0 blockers, 2 warnings resolved). Plans 01-01 through 01-04 are verified and ready.
-**Next Session**: Execute Phase 1 — run `/gsd-execute-phase 01`
-**Resume file**: .planning/phases/01-core-hibernation-engine/01-01-PLAN.md
+**Last Session**: 2026-04-30 — Plan 01-01 (Project Scaffold) executed completely. 4/4 tasks done, 13/13 unit tests pass, vite build exits 0.
+**Next Session**: Execute Plan 01-02 — Wave 1 Hibernation Logic
+**Resume file**: .planning/phases/01-core-hibernation-engine/01-02-PLAN.md
