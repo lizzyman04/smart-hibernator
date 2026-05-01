@@ -12,8 +12,7 @@ import { ALARM_NAME } from '../shared/constants'
 ensureHibernateAlarm()
 
 chrome.runtime.onInstalled.addListener(({ reason }) => {
-  if (reason === 'install' || reason === 'update') {
-    createContextMenus()
+  if (reason === 'install') {
     chrome.storage.local.set({
       hibernation_enabled: true,
       hibernated_count: 0,
@@ -21,9 +20,21 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
       protected_tabs: [],
       protected_domains: [],
     })
-    // Also call ensureHibernateAlarm() here for idempotency on install/update
-    ensureHibernateAlarm()
+  } else if (reason === 'update') {
+    // Only backfill keys that do not yet exist — avoid wiping user data on update
+    chrome.storage.local.get(
+      ['hibernation_enabled', 'protected_tabs', 'protected_domains'],
+      (existing) => {
+        const defaults: Record<string, unknown> = {}
+        if (existing['hibernation_enabled'] === undefined) defaults['hibernation_enabled'] = true
+        if (existing['protected_tabs'] === undefined) defaults['protected_tabs'] = []
+        if (existing['protected_domains'] === undefined) defaults['protected_domains'] = []
+        if (Object.keys(defaults).length > 0) chrome.storage.local.set(defaults)
+      }
+    )
   }
+  createContextMenus()
+  ensureHibernateAlarm()
 })
 
 chrome.alarms.onAlarm.addListener((alarm) => {
