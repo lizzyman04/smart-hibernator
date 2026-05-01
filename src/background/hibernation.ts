@@ -36,7 +36,6 @@ export async function handleAlarmTick(): Promise<void> {
     'tab_meta',
     'protected_tabs',
     'protected_domains',
-    'hibernated_count',
   ])
 
   const hibernationEnabled = (result['hibernation_enabled'] as boolean) ?? true
@@ -45,7 +44,6 @@ export async function handleAlarmTick(): Promise<void> {
   const tabMeta = (result['tab_meta'] as Record<number, TabMeta>) ?? {}
   const protectedTabs = (result['protected_tabs'] as number[]) ?? []
   const protectedDomains = (result['protected_domains'] as string[]) ?? []
-  let hibernatedCount = (result['hibernated_count'] as number) ?? 0
 
   // Query ALL tabs — isDiscardable handles URL/state filtering
   const tabs = await chrome.tabs.query({})
@@ -70,9 +68,10 @@ export async function handleAlarmTick(): Promise<void> {
   }
 
   if (newDiscards > 0) {
-    hibernatedCount += newDiscards
-    await chrome.storage.local.set({ hibernated_count: hibernatedCount })
-    await updateBadge(hibernatedCount)
+    const fresh = await chrome.storage.local.get('hibernated_count')
+    const freshCount = ((fresh['hibernated_count'] as number) ?? 0) + newDiscards
+    await chrome.storage.local.set({ hibernated_count: freshCount })
+    await updateBadge(freshCount)
   }
 }
 
