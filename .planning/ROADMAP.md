@@ -19,7 +19,7 @@
   2. Tabs playing audio, pinned, or containing unsaved forms (via simple heuristic) are exempt from auto-hibernation.
   3. User can manually trigger hibernation via a right-click context menu or `Ctrl+Shift+S`.
   4. Extension successfully loads as an MV3 extension in Chrome and Edge.
-**Plans**: TBD
+**Plans**: 4 plans (01-01, 01-02, 01-03, 01-04) — COMPLETE
 
 ### Phase 2: UI & Rich Previews
 **Goal**: Enhance the user experience with visual feedback and resource management visibility.
@@ -29,7 +29,13 @@
   1. Extension captures a compressed WebP thumbnail of a tab before it is discarded.
   2. Discarded tabs display a beautiful placeholder page showing the thumbnail and a "Wake Up" button.
   3. Dashboard displays real-time graphs of RAM and CPU savings.
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Wave 1: Foundation (deps, shadcn components, types, manifest/vite config, test stubs)
+- [ ] 02-02-PLAN.md — Wave 2: Service Worker backend (idb.ts, thumbnail.ts, index.ts + hibernation.ts refactor)
+- [ ] 02-03-PLAN.md — Wave 3: Popup redesign (hibernated-tab manager with list, Wake button, Dashboard link)
+- [ ] 02-04-PLAN.md — Wave 4: Dashboard page (Stats + Settings tabs, Recharts chart, slider, domain whitelist)
 **UI hint**: yes
 
 ### Phase 3: AI Intelligence
@@ -70,7 +76,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core Hibernation Engine | 4/4 | Complete | 01-01, 01-02, 01-03, 01-04 done (2026-04-30) |
-| 2. UI & Rich Previews | 0/1 | Not started | - |
+| 2. UI & Rich Previews | 0/4 | In Progress | - |
 | 3. AI Intelligence | 0/1 | Not started | - |
 | 4. Perfect State Restoration | 0/1 | Not started | - |
 | 5. Polishing & Launch | 0/1 | Not started | - |
