@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-last_updated: "2026-04-30T19:37:27.878Z"
+last_updated: "2026-05-01T00:00:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 4
+  total_plans: 8
   completed_plans: 4
-  percent: 100
+  percent: 20
 ---
 
 # Project State - Smart Hibernator
@@ -17,15 +17,15 @@ progress:
 ## Project Reference
 
 **Core Value**: A privacy-first, AI-powered Chrome extension that intelligently suspends inactive tabs to save RAM and battery.
-**Current Focus**: Phase 1 — Core Hibernation Engine
-**Success Definition**: MV3 extension installs, hibernates tabs after 45 min, popup works, unit + E2E tests pass.
+**Current Focus**: Phase 2 — UI & Rich Previews
+**Success Definition**: Thumbnail capture works, popup is a hibernated-tab manager, dashboard shows RAM savings graphs and settings.
 
 ## Current Position
 
-**Phase**: 1 (Core Hibernation Engine)
-**Plan**: COMPLETE (all 4 plans done)
-**Status**: PHASE_COMPLETE
-**Progress**: [██████████] 100%
+**Phase**: 2 (UI & Rich Previews)
+**Plan**: READY TO EXECUTE (4 plans planned, checker-verified)
+**Status**: READY_TO_EXECUTE
+**Progress**: [██████████] 100% (Phase 1 complete)
 
 ## Performance Metrics
 
@@ -33,7 +33,8 @@ progress:
 - **Requirements Mapped**: 20 (100%)
 - **Phases Defined**: 5
 - **Plans in Phase 1**: 4 (01-01 through 01-04, all checker-verified)
-- **Next Milestone**: Phase 2 Planning
+- **Plans in Phase 2**: 4 (02-01 through 02-04, checker-verified 2026-05-01)
+- **Next Milestone**: Phase 2 Execution
 - **01-01 Duration**: 738s | Tasks: 4/4 | Files: 34 created, 2 modified
 - **01-02 Duration**: 76s | Tasks: 1/1 | Files: 0 created, 1 modified
 - **01-03 Duration**: 95s | Tasks: 1/1 | Files: 0 created, 1 modified
@@ -48,7 +49,7 @@ progress:
 - **Inference Strategy**: ONNX Runtime Web in an Offscreen Document (Phase 3, deferred).
 - **Timeout**: 45 min hardcoded (`TIMEOUT_MS = 45 * 60 * 1000`).
 - **Form Protection**: 5 min expiry after last input activity (`FORM_PROTECTION_MS = 5 * 60 * 1000`).
-- **Tab Group Protection**: Deferred to Phase 2.
+- **Tab Group Protection**: Deferred further — not in Phase 2.
 - **Popup Architecture**: Popup calls `chrome.tabs.discard()` directly (documented deviation from Responsibility Map — acceptable for Phase 1).
 - **Alarm tick storage read**: Single `chrome.storage.local.get([...])` call reads all 5 keys atomically to minimize race window (Pitfall 2 mitigation).
 - **Discard counting**: Only non-undefined returns from `chrome.tabs.discard()` increment `hibernated_count` — Chrome returns undefined for no-op discards.
@@ -59,6 +60,13 @@ progress:
 - **vitest.config.ts e2e exclusion**: `exclude: ['tests/e2e/**']` prevents Playwright specs from being picked up by vitest runner.
 - **@types/react-dom version**: 19.2.3 used (19.2.5 does not exist on npm registry).
 - **shadcn style override**: Default/gray overrides shadcn's auto-selected base-nova style to match UI-SPEC.
+- **Phase 2 — Placeholder strategy**: No URL redirect; popup IS the placeholder surface. `chrome.tabs.discard()` kept from Phase 1; popup redesigned into hibernated-tab manager (D-01/D-02).
+- **Phase 2 — Thumbnail capture**: `chrome.tabs.captureVisibleTab()` with `tab.active === true` guard in `onUpdated`; OffscreenCanvas for WebP compression in SW; `idb` library (module-level dbPromise singleton); IndexedDB store `smart-hibernator/thumbnails` keyed by tabId; 25 MB cap with oldest-first eviction.
+- **Phase 2 — `activeTab` permission**: Required for `captureVisibleTab()`; added to manifest in Wave 0. `tabs` permission alone is insufficient.
+- **Phase 2 — Dashboard**: Dedicated extension page at `src/dashboard/index.html`; requires both `rollupOptions.input` in vite.config.ts AND `web_accessible_resources` in manifest (CRXJS does not auto-add); extension_pages CSP needs `style-src 'unsafe-inline'` for Recharts Tooltip.
+- **Phase 2 — Configurable timeout**: `timeout_minutes: number` in `chrome.storage.local` (default 45); `hibernation.ts` reads from storage on every alarm tick instead of using `TIMEOUT_MS` constant; no alarm recreation needed.
+- **Phase 2 — Wake tab**: `chrome.tabs.update(tabId, { active: true })` auto-reloads discarded tabs; no separate `chrome.tabs.reload()` call needed.
+- **Phase 2 — RAM estimate**: 150 MB per hibernated tab (conservative industry average); displayed as "~N MB freed" with tilde prefix to signal approximation.
 
 ### Todos
 
@@ -71,6 +79,6 @@ progress:
 
 ## Session Continuity
 
-**Last Session**: 2026-05-01 — Phase 2 context gathered. All 4 gray areas discussed: placeholder architecture (keep native discard, popup becomes hibernated-tab manager), dashboard (dedicated full-page, Recharts, Stats + Settings tabs), Phase 1 deferred settings (configurable timeout + domain whitelist UI included), thumbnail capture (on page load + on-demand refresh, IndexedDB tabId-keyed, 25MB cap).
-**Next Session**: Phase 2 planning (`/gsd-plan-phase 02`)
-**Resume file**: `.planning/phases/02-ui-and-rich-previews/02-CONTEXT.md`
+**Last Session**: 2026-05-01 — Phase 2 planned. Research complete (captureVisibleTab constraints, idb singleton, CRXJS multi-entry, Recharts CSP, Wave 0 test gaps). 4 plans created (02-01 through 02-04), checker-verified (0 blockers). Minor info fix applied: `src/background/index.ts` added to 02-04 files_modified.
+**Next Session**: Phase 2 execution (`/gsd-execute-phase 02`)
+**Resume file**: `.planning/phases/02-ui-and-rich-previews/02-01-PLAN.md`
