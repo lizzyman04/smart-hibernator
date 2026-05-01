@@ -28,7 +28,7 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
-    handleAlarmTick()
+    handleAlarmTick().catch((err) => console.error('[smart-hibernator] alarm tick failed', err))
   }
 })
 
