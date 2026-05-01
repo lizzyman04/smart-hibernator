@@ -95,7 +95,9 @@ export default function App() {
     try {
       const discarded = await chrome.tabs.discard(state.currentTabId)
       if (discarded !== undefined) {
-        const newCount = state.hibernatedCount + 1
+        const result = await chrome.storage.local.get('hibernated_count')
+        const currentCount = (result['hibernated_count'] as number) ?? 0
+        const newCount = currentCount + 1
         await chrome.storage.local.set({ hibernated_count: newCount })
         await chrome.action.setBadgeText({ text: newCount > 0 ? String(newCount) : '' })
         await chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' })
