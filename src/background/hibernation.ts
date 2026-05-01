@@ -23,7 +23,7 @@ export function isDiscardable(
   } catch {
     return false
   }
-  const lastActive = meta?.lastActiveAt ?? now
+  const lastActive = meta?.lastActiveAt ?? 0
   if (now - lastActive < TIMEOUT_MS) return false
   if (meta?.lastFormActivity && now - meta.lastFormActivity < FORM_PROTECTION_MS) return false
   return true
