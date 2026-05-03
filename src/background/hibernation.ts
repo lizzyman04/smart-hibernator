@@ -1,5 +1,5 @@
-import type { TabMeta } from '../shared/types'
-import { TIMEOUT_MS, FORM_PROTECTION_MS } from '../shared/constants'
+import type { TabMeta, HibernationEvent } from '../shared/types'
+import { FORM_PROTECTION_MS } from '../shared/constants'
 import { updateBadge } from './badge'
 
 export function isDiscardable(
@@ -7,7 +7,8 @@ export function isDiscardable(
   meta: TabMeta | undefined,
   now: number,
   protectedTabs: number[],
-  protectedDomains: string[]
+  protectedDomains: string[],
+  timeoutMs: number   // NEW — replaces TIMEOUT_MS constant; value comes from storage
 ): boolean {
   if (!tab.id || !tab.url) return false
   if (!tab.url.startsWith('http://') && !tab.url.startsWith('https://')) return false
@@ -24,7 +25,7 @@ export function isDiscardable(
     return false
   }
   const lastActive = meta?.lastActiveAt ?? 0
-  if (now - lastActive < TIMEOUT_MS) return false
+  if (now - lastActive < timeoutMs) return false
   if (meta?.lastFormActivity && now - meta.lastFormActivity < FORM_PROTECTION_MS) return false
   return true
 }
@@ -36,10 +37,13 @@ export async function handleAlarmTick(): Promise<void> {
     'tab_meta',
     'protected_tabs',
     'protected_domains',
+    'timeout_minutes',    // Phase 2 — user-configurable timeout
   ])
 
   const hibernationEnabled = (result['hibernation_enabled'] as boolean) ?? true
   if (!hibernationEnabled) return
+
+  const timeoutMs = ((result['timeout_minutes'] as number) ?? 45) * 60 * 1000
 
   const tabMeta = (result['tab_meta'] as Record<number, TabMeta>) ?? {}
   const protectedTabs = (result['protected_tabs'] as number[]) ?? []
@@ -54,13 +58,23 @@ export async function handleAlarmTick(): Promise<void> {
   for (const tab of tabs) {
     if (!tab.id) continue
     const meta = tabMeta[tab.id]
-    if (!isDiscardable(tab, meta, now, protectedTabs, protectedDomains)) continue
+    if (!isDiscardable(tab, meta, now, protectedTabs, protectedDomains, timeoutMs)) continue
 
     try {
       const discarded = await chrome.tabs.discard(tab.id)
       // discard() returns undefined when the tab cannot be discarded (already discarded, active, protected)
       if (discarded !== undefined) {
         newDiscards++
+        // Record hibernation event for 7-day chart (FR-10)
+        chrome.storage.local.get('hibernation_events', (r) => {
+          const events: HibernationEvent[] = (r['hibernation_events'] as HibernationEvent[]) ?? []
+          events.push({ timestamp: Date.now(), tabId: tab.id!, url: tab.url! })
+          // Keep only last 7 days of events
+          const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+          chrome.storage.local.set({
+            hibernation_events: events.filter((e) => e.timestamp > cutoff),
+          })
+        })
       }
     } catch {
       // Tab may have been closed between query and discard — silently continue

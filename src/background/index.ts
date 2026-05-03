@@ -5,6 +5,8 @@ import { handleAlarmTick, handleManualHibernate } from './hibernation'
 import { createContextMenus } from './contextMenus'
 import { ensureHibernateAlarm } from './alarms'
 import { ALARM_NAME } from '../shared/constants'
+import { captureAndStore } from './thumbnail'
+import { deleteThumbnail } from './idb'
 
 // IMPORTANT: Call ensureHibernateAlarm() at module top level so it runs on
 // EVERY SW restart, not just on install events. This prevents hibernation from
@@ -19,16 +21,20 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
       tab_meta: {},
       protected_tabs: [],
       protected_domains: [],
+      timeout_minutes: 45,
+      hibernation_events: [],
     })
   } else if (reason === 'update') {
     // Only backfill keys that do not yet exist — avoid wiping user data on update
     chrome.storage.local.get(
-      ['hibernation_enabled', 'protected_tabs', 'protected_domains'],
+      ['hibernation_enabled', 'protected_tabs', 'protected_domains', 'timeout_minutes', 'hibernation_events'],
       (existing) => {
         const defaults: Record<string, unknown> = {}
         if (existing['hibernation_enabled'] === undefined) defaults['hibernation_enabled'] = true
         if (existing['protected_tabs'] === undefined) defaults['protected_tabs'] = []
         if (existing['protected_domains'] === undefined) defaults['protected_domains'] = []
+        if (existing['timeout_minutes'] === undefined) defaults['timeout_minutes'] = 45
+        if (existing['hibernation_events'] === undefined) defaults['hibernation_events'] = []
         if (Object.keys(defaults).length > 0) chrome.storage.local.set(defaults)
       }
     )
@@ -51,12 +57,24 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
   })
 })
 
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // Only capture when page has finished loading AND the tab is currently active
+  // captureVisibleTab is hard-constrained to the active tab — RESEARCH.md Pitfall 2
+  if (changeInfo.status !== 'complete') return
+  if (!tab.active) return
+  if (!tab.url?.startsWith('http')) return
+  captureAndStore(tabId, tab.url, tab.windowId).catch((err) =>
+    console.error('[smart-hibernator] thumbnail capture failed', err)
+  )
+})
+
 chrome.tabs.onRemoved.addListener((tabId) => {
   chrome.storage.local.get('tab_meta', (result) => {
     const tab_meta = (result.tab_meta as Record<number, unknown>) || {}
     delete tab_meta[tabId]
     chrome.storage.local.set({ tab_meta })
   })
+  deleteThumbnail(tabId).catch(() => { /* silently ignore — tab already gone */ })
 })
 
 chrome.runtime.onMessage.addListener((message, sender) => {
