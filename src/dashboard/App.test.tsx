@@ -60,11 +60,11 @@ describe('Dashboard App (FR-10)', () => {
     })
     const { default: App } = await import('./App')
     render(<App />)
-    // Click Settings tab to see Settings content
+    // Radix Tabs activates on mouseDown (button=0, ctrlKey=false) — fireEvent.click alone won't switch tabs
     await waitFor(() => {
-      expect(screen.getByText('Settings')).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: 'Settings' })).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByText('Settings'))
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Settings' }), { button: 0, ctrlKey: false })
     await waitFor(() => {
       expect(screen.getByText('60 minutes')).toBeInTheDocument()
     })
@@ -73,7 +73,8 @@ describe('Dashboard App (FR-10)', () => {
   it('Settings tab: handleAddDomain strips https:// before storing', async () => {
     const { default: App } = await import('./App')
     render(<App />)
-    fireEvent.click(screen.getByText('Settings'))
+    // Radix Tabs activates on mouseDown (button=0, ctrlKey=false)
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Settings' }), { button: 0, ctrlKey: false })
     await waitFor(() => {
       expect(screen.getByPlaceholderText('e.g. github.com')).toBeInTheDocument()
     })
@@ -91,20 +92,16 @@ describe('Dashboard App (FR-10)', () => {
   it('Settings tab: handleAddDomain rejects empty string — shows error', async () => {
     const { default: App } = await import('./App')
     render(<App />)
-    fireEvent.click(screen.getByText('Settings'))
+    // Radix Tabs activates on mouseDown (button=0, ctrlKey=false)
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Settings' }), { button: 0, ctrlKey: false })
     await waitFor(() => {
       expect(screen.getByText('Add Domain')).toBeInTheDocument()
     })
-    // Attempt to add empty — need to click with empty input
-    // Note: The Add Domain button is disabled when domainInput is empty (trimmed).
-    // To test the error path, we set a value then clear it and try to add
+    // Use 'https://' as input — it is non-empty so button is enabled, but after stripping
+    // the protocol prefix the domain becomes '', triggering "Please enter a domain." error
     const input = screen.getByPlaceholderText('e.g. github.com')
-    fireEvent.change(input, { target: { value: '   ' } })
-    // The button may be disabled for whitespace-only input — click anyway to trigger handler
-    const addBtn = screen.getByText('Add Domain')
-    // Temporarily remove disabled to force click
-    addBtn.removeAttribute('disabled')
-    fireEvent.click(addBtn)
+    fireEvent.change(input, { target: { value: 'https://' } })
+    fireEvent.click(screen.getByText('Add Domain'))
     await waitFor(() => {
       expect(screen.getByText('Please enter a domain.')).toBeInTheDocument()
     })
@@ -119,7 +116,8 @@ describe('Dashboard App (FR-10)', () => {
     })
     const { default: App } = await import('./App')
     render(<App />)
-    fireEvent.click(screen.getByText('Settings'))
+    // Radix Tabs activates on mouseDown (button=0, ctrlKey=false)
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Settings' }), { button: 0, ctrlKey: false })
     await waitFor(() => {
       expect(screen.getByPlaceholderText('e.g. github.com')).toBeInTheDocument()
     })
@@ -141,7 +139,8 @@ describe('Dashboard App (FR-10)', () => {
     })
     const { default: App } = await import('./App')
     render(<App />)
-    fireEvent.click(screen.getByText('Settings'))
+    // Radix Tabs activates on mouseDown (button=0, ctrlKey=false)
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Settings' }), { button: 0, ctrlKey: false })
     await waitFor(() => {
       expect(screen.getByLabelText('Remove github.com')).toBeInTheDocument()
     })

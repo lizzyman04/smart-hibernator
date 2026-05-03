@@ -88,6 +88,15 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   }
 })
 
+// Handle on-demand thumbnail capture request from dashboard "Refresh thumbnails" button (D-14)
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'CAPTURE_TAB' && typeof message.tabId === 'number' && typeof message.windowId === 'number') {
+    captureAndStore(message.tabId as number, '', message.windowId as number).catch(() => {
+      /* silently ignore — tab may have been restored */
+    })
+  }
+})
+
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'hibernate-tab' && tab?.id) {
     handleManualHibernate(tab.id)

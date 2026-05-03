@@ -20,6 +20,19 @@ const chromeMV3Action = {
 
 Object.assign(global, { chrome: { ...chrome, action: chromeMV3Action } })
 
+// ResizeObserver is not implemented in jsdom — required by Recharts ResponsiveContainer
+// Polyfill with a no-op stub so dashboard App.test.tsx can render without throwing
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+Object.defineProperty(globalThis, 'ResizeObserver', {
+  writable: true,
+  configurable: true,
+  value: ResizeObserverStub,
+})
+
 // fake-indexeddb/auto installs global indexedDB, IDBKeyRange, etc. in jsdom scope
 // Required for src/background/idb.test.ts (FR-08)
 import 'fake-indexeddb/auto'
