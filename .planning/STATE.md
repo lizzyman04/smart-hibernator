@@ -8,7 +8,7 @@ progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 20
 ---
 
@@ -23,9 +23,9 @@ progress:
 ## Current Position
 
 **Phase**: 2 (UI & Rich Previews)
-**Plan**: 02-02 COMPLETE (2/4 Phase 2 plans done)
+**Plan**: 02-03 COMPLETE (3/4 Phase 2 plans done)
 **Status**: IN_PROGRESS
-**Progress**: [██████████] 100% Phase 1 + [████░░░░░░] 50% Phase 2
+**Progress**: [██████████] 100% Phase 1 + [██████░░░░] 75% Phase 2
 
 ## Performance Metrics
 
@@ -82,6 +82,6 @@ progress:
 
 ## Session Continuity
 
-**Last Session**: 2026-05-03 — Plan 02-02 (Wave 1 SW Backend) executed. idb.ts (IDB CRUD singleton + pruneIfNeeded), thumbnail.ts (captureAndStore + compressToWebP with OffscreenCanvas guard), index.ts extended (onUpdated + onRemoved + onInstalled), hibernation.ts extended (timeoutMs param, timeout_minutes storage read, HibernationEvent append with 7-day filter). npm test: 6 files, 28 passing, 12 todo, 0 failures.
-**Next Session**: Execute Plan 02-03 (Wave 2 — Popup redesign: hibernated-tab manager with list, Wake button, Dashboard link)
-**Resume file**: `.planning/phases/02-ui-and-rich-previews/02-03-PLAN.md`
+**Last Session**: 2026-05-03 — Plan 02-03 (Wave 3 Popup Redesign) executed. App.tsx redesigned as hibernated-tab manager: chrome.tabs.query({discarded:true}), getThumbnail per tab, Wake Tab (chrome.tabs.update), Dashboard footer link (chrome.runtime.getURL). All Phase 1 elements retained. 5 behavioral tests GREEN. npm test: 6 files, 32 passing, 7 todo, 0 failures.
+**Next Session**: Execute Plan 02-04 (Wave 4 — Dashboard page: Stats + Settings tabs, Recharts chart, slider, domain whitelist)
+**Resume file**: `.planning/phases/02-ui-and-rich-previews/02-04-PLAN.md`
