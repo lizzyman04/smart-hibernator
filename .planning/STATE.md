@@ -8,8 +8,8 @@ progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 7
-  percent: 20
+  completed_plans: 8
+  percent: 40
 ---
 
 # Project State - Smart Hibernator
@@ -23,9 +23,9 @@ progress:
 ## Current Position
 
 **Phase**: 2 (UI & Rich Previews)
-**Plan**: 02-03 COMPLETE (3/4 Phase 2 plans done)
+**Plan**: 02-04 COMPLETE (4/4 Phase 2 plans done)
 **Status**: IN_PROGRESS
-**Progress**: [██████████] 100% Phase 1 + [██████░░░░] 75% Phase 2
+**Progress**: [██████████] 100% Phase 1 + [██████████] 100% Phase 2
 
 ## Performance Metrics
 
@@ -70,6 +70,9 @@ progress:
 - **shadcn CLI invocation**: Use `node node_modules/shadcn/dist/index.js add <component> --yes` — no shell binary registered in node_modules/.bin; `npx shadcn add` fails.
 - **vitest.config.ts resolve.alias**: Must mirror vite.config.ts alias (`@` → `src/`) so shadcn components importing `@/lib/utils` resolve correctly in test environment.
 - **chrome.storage.onChanged mock**: `addListener`/`removeListener` are real event-emitter functions in vitest-chrome (not vi.fn() spies) — never call `.mockReturnValue` on them in tests.
+- **Radix Tabs JSDOM activation**: `fireEvent.mouseDown(tab, {button:0, ctrlKey:false})` required to switch tabs in tests — Radix UI Tabs v1.x listens to `onMouseDown`, not `onClick`. `fireEvent.click` alone does not trigger tab switching.
+- **ResizeObserver polyfill**: Added `ResizeObserverStub` to `vitest.setup.ts` — Recharts `ResponsiveContainer` requires it; JSDOM does not implement it.
+- **Phase 2 — Empty string via protocol-only input**: Use `'https://'` to test empty-domain validation when button `disabled={!domainInput.trim()}` — it strips to `''` after regex, triggering the error path while keeping button enabled.
 
 ### Todos
 
@@ -82,6 +85,6 @@ progress:
 
 ## Session Continuity
 
-**Last Session**: 2026-05-03 — Plan 02-03 (Wave 3 Popup Redesign) executed. App.tsx redesigned as hibernated-tab manager: chrome.tabs.query({discarded:true}), getThumbnail per tab, Wake Tab (chrome.tabs.update), Dashboard footer link (chrome.runtime.getURL). All Phase 1 elements retained. 5 behavioral tests GREEN. npm test: 6 files, 32 passing, 7 todo, 0 failures.
-**Next Session**: Execute Plan 02-04 (Wave 4 — Dashboard page: Stats + Settings tabs, Recharts chart, slider, domain whitelist)
-**Resume file**: `.planning/phases/02-ui-and-rich-previews/02-04-PLAN.md`
+**Last Session**: 2026-05-03 — Plan 02-04 (Wave 4 Dashboard) executed. Dashboard created: index.html, index.css, main.tsx scaffold + App.tsx (Stats tab with hero metric/Recharts BarChart/Refresh button, Settings tab with Slider/domain whitelist). CAPTURE_TAB handler added to index.ts. ResizeObserver polyfill added to vitest.setup.ts. 8 behavioral tests GREEN. npm test: 6 files, 39 passing, 0 todo, 0 failures. Phase 2 complete.
+**Next Session**: Execute Phase 3 (AI Intelligence) — ONNX Runtime, tab vitality classification
+**Resume file**: `.planning/ROADMAP.md`
