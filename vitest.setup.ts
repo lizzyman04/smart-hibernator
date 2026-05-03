@@ -19,3 +19,7 @@ const chromeMV3Action = {
 }
 
 Object.assign(global, { chrome: { ...chrome, action: chromeMV3Action } })
+
+// fake-indexeddb/auto installs global indexedDB, IDBKeyRange, etc. in jsdom scope
+// Required for src/background/idb.test.ts (FR-08)
+import 'fake-indexeddb/auto'

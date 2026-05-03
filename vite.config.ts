@@ -11,7 +11,14 @@ import manifest from './manifest.json'
 export default defineConfig({
   base: './',
   plugins: [react(), tailwindcss(), crx({ manifest })],
-  build: { assetsInlineLimit: 0 },
+  build: {
+    assetsInlineLimit: 0,
+    rollupOptions: {
+      input: {
+        dashboard: resolve(__dirname, 'src/dashboard/index.html'),
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

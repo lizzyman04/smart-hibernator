@@ -3,12 +3,20 @@ export interface TabMeta {
   lastFormActivity?: number
 }
 
+export interface HibernationEvent {
+  timestamp: number   // unix ms
+  tabId: number
+  url: string
+}
+
 export interface StorageSchema {
   hibernation_enabled: boolean
   hibernated_count: number
   tab_meta: Record<number, TabMeta>
   protected_tabs: number[]
   protected_domains: string[]
+  timeout_minutes: number              // Phase 2 — default 45; user-configurable
+  hibernation_events: HibernationEvent[]  // Phase 2 — for 7-day chart; max 7 days retained
 }
 
 export type StorageKey = keyof StorageSchema
