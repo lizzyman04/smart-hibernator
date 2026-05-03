@@ -1,23 +1,37 @@
-// Wave 0 stub — covers FR-08 thumbnail compression contract
-// Real implementation (thumbnail.ts) created in Plan 02-02 (Wave 1)
+// Covers FR-08 thumbnail capture + compression contract
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { compressToWebP, captureAndStore } from './thumbnail'
 
-// jsdom does not implement OffscreenCanvas — compressToWebP must guard and return null
-// This test becomes GREEN once thumbnail.ts is implemented with the OffscreenCanvas guard
+// Mock the idb module so tests do not touch real IndexedDB
+vi.mock('./idb', () => ({
+  putThumbnail: vi.fn().mockResolvedValue(undefined),
+  pruneIfNeeded: vi.fn().mockResolvedValue(undefined),
+}))
 
-// Stub import — replace once thumbnail.ts exists in Wave 1:
-// import { compressToWebP, captureAndStore } from './thumbnail'
-
-describe('thumbnail compression (FR-08) — Wave 0 stubs', () => {
+describe('thumbnail compression (FR-08)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(chrome.tabs.captureVisibleTab).mockResolvedValue('data:image/png;base64,FAKEPNG')
   })
 
   it('Wave 0 infrastructure check: OffscreenCanvas is not available in jsdom (expected)', () => {
     expect(typeof OffscreenCanvas).toBe('undefined')
   })
 
-  it.todo('compressToWebP returns null when OffscreenCanvas is unavailable (jsdom guard)')
-  it.todo('captureAndStore calls chrome.tabs.captureVisibleTab with the correct windowId')
-  it.todo('captureAndStore skips storage when compressToWebP returns null')
+  it('compressToWebP returns null when OffscreenCanvas is unavailable', async () => {
+    const result = await compressToWebP('data:image/png;base64,ABC')
+    expect(result).toBeNull()
+  })
+
+  it('captureAndStore calls chrome.tabs.captureVisibleTab with correct windowId', async () => {
+    await captureAndStore(42, 'https://example.com', 1)
+    expect(chrome.tabs.captureVisibleTab).toHaveBeenCalledWith(1, { format: 'png' })
+  })
+
+  it('captureAndStore does NOT call putThumbnail when compressToWebP returns null (jsdom)', async () => {
+    const { putThumbnail } = await import('./idb')
+    await captureAndStore(42, 'https://example.com', 1)
+    // compressToWebP returns null in jsdom — putThumbnail must NOT be called
+    expect(putThumbnail).not.toHaveBeenCalled()
+  })
 })
