@@ -33,7 +33,7 @@
 
 Plans:
 - [x] 02-01-PLAN.md — Wave 1: Foundation (deps, shadcn components, types, manifest/vite config, test stubs)
-- [ ] 02-02-PLAN.md — Wave 2: Service Worker backend (idb.ts, thumbnail.ts, index.ts + hibernation.ts refactor)
+- [x] 02-02-PLAN.md — Wave 2: Service Worker backend (idb.ts, thumbnail.ts, index.ts + hibernation.ts refactor)
 - [ ] 02-03-PLAN.md — Wave 3: Popup redesign (hibernated-tab manager with list, Wake button, Dashboard link)
 - [ ] 02-04-PLAN.md — Wave 4: Dashboard page (Stats + Settings tabs, Recharts chart, slider, domain whitelist)
 **UI hint**: yes
@@ -76,7 +76,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core Hibernation Engine | 4/4 | Complete | 01-01, 01-02, 01-03, 01-04 done (2026-04-30) |
-| 2. UI & Rich Previews | 1/4 | In Progress | 02-01 done (2026-05-03) |
+| 2. UI & Rich Previews | 2/4 | In Progress | 02-01, 02-02 done (2026-05-03) |
 | 3. AI Intelligence | 0/1 | Not started | - |
 | 4. Perfect State Restoration | 0/1 | Not started | - |
 | 5. Polishing & Launch | 0/1 | Not started | - |

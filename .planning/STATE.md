@@ -8,7 +8,7 @@ progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 6
   percent: 20
 ---
 
@@ -23,9 +23,9 @@ progress:
 ## Current Position
 
 **Phase**: 2 (UI & Rich Previews)
-**Plan**: 02-01 COMPLETE (1/4 Phase 2 plans done)
+**Plan**: 02-02 COMPLETE (2/4 Phase 2 plans done)
 **Status**: IN_PROGRESS
-**Progress**: [██████████] 100% Phase 1 + [██░░░░░░░░] 25% Phase 2
+**Progress**: [██████████] 100% Phase 1 + [████░░░░░░] 50% Phase 2
 
 ## Performance Metrics
 
@@ -82,6 +82,6 @@ progress:
 
 ## Session Continuity
 
-**Last Session**: 2026-05-03 — Plan 02-01 (Wave 0 Foundation) executed. idb/recharts/testing-library deps installed, shadcn slider/tabs/input/scroll-area scaffolded, HibernationEvent types + Phase 2 constants added, manifest CSP + activeTab + dashboard entry wired, four Wave 0 test stubs passing (6 files, 20 pass, 20 todo). 2 auto-fixes: resolve.alias in vitest.config.ts, onChanged mock fix.
-**Next Session**: Execute Plan 02-02 (Wave 1 — idb.ts, thumbnail.ts, hibernation.ts refactor)
-**Resume file**: `.planning/phases/02-ui-and-rich-previews/02-02-PLAN.md`
+**Last Session**: 2026-05-03 — Plan 02-02 (Wave 1 SW Backend) executed. idb.ts (IDB CRUD singleton + pruneIfNeeded), thumbnail.ts (captureAndStore + compressToWebP with OffscreenCanvas guard), index.ts extended (onUpdated + onRemoved + onInstalled), hibernation.ts extended (timeoutMs param, timeout_minutes storage read, HibernationEvent append with 7-day filter). npm test: 6 files, 28 passing, 12 todo, 0 failures.
+**Next Session**: Execute Plan 02-03 (Wave 2 — Popup redesign: hibernated-tab manager with list, Wake button, Dashboard link)
+**Resume file**: `.planning/phases/02-ui-and-rich-previews/02-03-PLAN.md`
