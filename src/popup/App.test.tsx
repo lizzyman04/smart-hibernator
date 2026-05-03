@@ -79,7 +79,8 @@ describe('Popup App (FR-09)', () => {
       expect(screen.getByText('Wake Tab')).toBeInTheDocument()
     })
     expect(screen.getByText('Example Domain')).toBeInTheDocument()
-    expect(screen.getByText('example.com')).toBeInTheDocument()
+    // domain appears in both fallback card and row body — getAllByText confirms presence
+    expect(screen.getAllByText('example.com').length).toBeGreaterThan(0)
   })
 
   it('Wake Tab button calls chrome.tabs.update(tabId, {active:true})', async () => {
