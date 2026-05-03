@@ -8,7 +8,7 @@ progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 8
-  completed_plans: 4
+  completed_plans: 5
   percent: 20
 ---
 
@@ -23,9 +23,9 @@ progress:
 ## Current Position
 
 **Phase**: 2 (UI & Rich Previews)
-**Plan**: READY TO EXECUTE (4 plans planned, checker-verified)
-**Status**: READY_TO_EXECUTE
-**Progress**: [██████████] 100% (Phase 1 complete)
+**Plan**: 02-01 COMPLETE (1/4 Phase 2 plans done)
+**Status**: IN_PROGRESS
+**Progress**: [██████████] 100% Phase 1 + [██░░░░░░░░] 25% Phase 2
 
 ## Performance Metrics
 
@@ -67,6 +67,9 @@ progress:
 - **Phase 2 — Configurable timeout**: `timeout_minutes: number` in `chrome.storage.local` (default 45); `hibernation.ts` reads from storage on every alarm tick instead of using `TIMEOUT_MS` constant; no alarm recreation needed.
 - **Phase 2 — Wake tab**: `chrome.tabs.update(tabId, { active: true })` auto-reloads discarded tabs; no separate `chrome.tabs.reload()` call needed.
 - **Phase 2 — RAM estimate**: 150 MB per hibernated tab (conservative industry average); displayed as "~N MB freed" with tilde prefix to signal approximation.
+- **shadcn CLI invocation**: Use `node node_modules/shadcn/dist/index.js add <component> --yes` — no shell binary registered in node_modules/.bin; `npx shadcn add` fails.
+- **vitest.config.ts resolve.alias**: Must mirror vite.config.ts alias (`@` → `src/`) so shadcn components importing `@/lib/utils` resolve correctly in test environment.
+- **chrome.storage.onChanged mock**: `addListener`/`removeListener` are real event-emitter functions in vitest-chrome (not vi.fn() spies) — never call `.mockReturnValue` on them in tests.
 
 ### Todos
 
@@ -79,6 +82,6 @@ progress:
 
 ## Session Continuity
 
-**Last Session**: 2026-05-01 — Phase 2 planned. Research complete (captureVisibleTab constraints, idb singleton, CRXJS multi-entry, Recharts CSP, Wave 0 test gaps). 4 plans created (02-01 through 02-04), checker-verified (0 blockers). Minor info fix applied: `src/background/index.ts` added to 02-04 files_modified.
-**Next Session**: Phase 2 execution (`/gsd-execute-phase 02`)
-**Resume file**: `.planning/phases/02-ui-and-rich-previews/02-01-PLAN.md`
+**Last Session**: 2026-05-03 — Plan 02-01 (Wave 0 Foundation) executed. idb/recharts/testing-library deps installed, shadcn slider/tabs/input/scroll-area scaffolded, HibernationEvent types + Phase 2 constants added, manifest CSP + activeTab + dashboard entry wired, four Wave 0 test stubs passing (6 files, 20 pass, 20 todo). 2 auto-fixes: resolve.alias in vitest.config.ts, onChanged mock fix.
+**Next Session**: Execute Plan 02-02 (Wave 1 — idb.ts, thumbnail.ts, hibernation.ts refactor)
+**Resume file**: `.planning/phases/02-ui-and-rich-previews/02-02-PLAN.md`
