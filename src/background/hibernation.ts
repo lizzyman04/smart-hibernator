@@ -65,16 +65,17 @@ export async function handleAlarmTick(): Promise<void> {
       // discard() returns undefined when the tab cannot be discarded (already discarded, active, protected)
       if (discarded !== undefined) {
         newDiscards++
-        // Record hibernation event for 7-day chart (FR-10)
-        chrome.storage.local.get('hibernation_events', (r) => {
-          const events: HibernationEvent[] = (r['hibernation_events'] as HibernationEvent[]) ?? []
-          events.push({ timestamp: Date.now(), tabId: tab.id!, url: tab.url! })
-          // Keep only last 7 days of events
+        try {
+          const evResult = await chrome.storage.local.get('hibernation_events')
+          const events: HibernationEvent[] = (evResult['hibernation_events'] as HibernationEvent[]) ?? []
           const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-          chrome.storage.local.set({
+          events.push({ timestamp: Date.now(), tabId: tab.id!, url: tab.url! })
+          await chrome.storage.local.set({
             hibernation_events: events.filter((e) => e.timestamp > cutoff),
           })
-        })
+        } catch {
+          // Storage quota exceeded or tab gone — silently continue
+        }
       }
     } catch {
       // Tab may have been closed between query and discard — silently continue

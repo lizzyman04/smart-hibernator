@@ -96,16 +96,20 @@ export default function App() {
   }
 
   function handleAddDomain() {
-    const domain = state.domainInput.trim().replace(/^https?:\/\//, '').trim()
-    if (!domain) {
+    const raw = state.domainInput.trim().replace(/^https?:\/\//, '').split('/')[0].trim()
+    if (!raw) {
       setState((prev) => ({ ...prev, domainError: 'Please enter a domain.' }))
       return
     }
-    if (state.protectedDomains.includes(domain)) {
+    if (!/^[a-zA-Z0-9.-]+$/.test(raw)) {
+      setState((prev) => ({ ...prev, domainError: 'Enter a plain domain, e.g. github.com' }))
+      return
+    }
+    if (state.protectedDomains.includes(raw)) {
       setState((prev) => ({ ...prev, domainError: 'Domain already protected.' }))
       return
     }
-    const updated = [...state.protectedDomains, domain]
+    const updated = [...state.protectedDomains, raw]
     chrome.storage.local.set({ protected_domains: updated })
     setState((prev) => ({ ...prev, protectedDomains: updated, domainInput: '', domainError: '' }))
   }
@@ -127,6 +131,7 @@ export default function App() {
             type: 'CAPTURE_TAB',
             tabId: tab.id,
             windowId: tab.windowId,
+            url: tab.url ?? '',
           }).catch(() => { /* tab may have been restored */ })
         })
       )

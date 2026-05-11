@@ -130,23 +130,8 @@ export default function App() {
     if (!state.currentTabId || state.isCurrentTabDiscarded || state.isCurrentTabProtected) return
     setState((prev) => ({ ...prev, isHibernating: true }))
     try {
-      const discarded = await chrome.tabs.discard(state.currentTabId)
-      if (discarded !== undefined) {
-        const result = await chrome.storage.local.get('hibernated_count')
-        const currentCount = (result['hibernated_count'] as number) ?? 0
-        const newCount = currentCount + 1
-        await chrome.storage.local.set({ hibernated_count: newCount })
-        await chrome.action.setBadgeText({ text: newCount > 0 ? String(newCount) : '' })
-        await chrome.action.setBadgeBackgroundColor({ color: '#F59E0B' })
-        setState((prev) => ({
-          ...prev,
-          hibernatedCount: newCount,
-          isCurrentTabDiscarded: true,
-          isHibernating: false,
-        }))
-      } else {
-        setState((prev) => ({ ...prev, isHibernating: false, isCurrentTabDiscarded: true }))
-      }
+      await chrome.runtime.sendMessage({ type: 'MANUAL_HIBERNATE', tabId: state.currentTabId })
+      setState((prev) => ({ ...prev, isCurrentTabDiscarded: true, isHibernating: false }))
     } catch {
       setState((prev) => ({ ...prev, isHibernating: false }))
     }
@@ -277,7 +262,7 @@ export default function App() {
                   <img src={tab.dataUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-20 h-12 rounded bg-gradient-to-br from-zinc-800 to-zinc-950 flex flex-col items-center justify-center gap-1">
-                    {tab.favIconUrl ? (
+                    {tab.favIconUrl && (tab.favIconUrl.startsWith('data:') || tab.favIconUrl.startsWith('chrome-extension://')) ? (
                       <img src={tab.favIconUrl} className="w-4 h-4 rounded-sm" alt="" />
                     ) : (
                       <Globe className="w-3.5 h-3.5 text-zinc-500" />

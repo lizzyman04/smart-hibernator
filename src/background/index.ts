@@ -85,15 +85,16 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       tab_meta[tabId] = { ...tab_meta[tabId], lastFormActivity: message.timestamp as number }
       chrome.storage.local.set({ tab_meta })
     })
+    return
   }
-})
 
-// Handle on-demand thumbnail capture request from dashboard "Refresh thumbnails" button (D-14)
-chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === 'MANUAL_HIBERNATE' && typeof message.tabId === 'number') {
+    handleManualHibernate(message.tabId as number).catch(() => {})
+    return
+  }
+
   if (message.type === 'CAPTURE_TAB' && typeof message.tabId === 'number' && typeof message.windowId === 'number') {
-    captureAndStore(message.tabId as number, '', message.windowId as number).catch(() => {
-      /* silently ignore — tab may have been restored */
-    })
+    captureAndStore(message.tabId as number, (message.url as string) ?? '', message.windowId as number).catch(() => {})
   }
 })
 
