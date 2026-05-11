@@ -47,7 +47,13 @@ Plans:
   2. Tabs are classified into "Vital", "Semi-Active", or "Dead" based on usage history.
   3. Auto-hibernation delay varies dynamically based on AI classification confidence.
   4. No user data or behavior logs leave the device (100% local inference).
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Wave 1: Foundation (ORT deps, manifest CSP, vite static-copy, types/constants, ONNX model, test stubs)
+- [ ] 03-02-PLAN.md — Wave 2: Offscreen Document + classifier.ts + idb.ts v2 (tab-history, domain-bias)
+- [ ] 03-03-PLAN.md — Wave 3: ai-learning.ts + isDiscardable AI integration + SW behavioral hooks + KEEP_ALIVE
+- [ ] 03-04-PLAN.md — Wave 4: Popup V/S/D pill + Keep Alive button + Dashboard AI summary
 
 ### Phase 4: Perfect State Restoration
 **Goal**: Ensure that waking a tab feels like it was never gone by restoring all session state.
@@ -77,6 +83,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Core Hibernation Engine | 4/4 | Complete | 01-01, 01-02, 01-03, 01-04 done (2026-04-30) |
 | 2. UI & Rich Previews | 4/4 | Complete | 02-01, 02-02, 02-03, 02-04 done (2026-05-03) |
-| 3. AI Intelligence | 0/1 | Not started | - |
+| 3. AI Intelligence | 0/4 | Planning complete | - |
 | 4. Perfect State Restoration | 0/1 | Not started | - |
 | 5. Polishing & Launch | 0/1 | Not started | - |
