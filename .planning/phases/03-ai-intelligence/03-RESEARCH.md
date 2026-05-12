@@ -584,22 +584,22 @@ export function isDiscardable(
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **ORT-Web WASM import mode in CRXJS builds**
    - What we know: CRXJS bundles ESM entry points; ORT-Web ships `ort.wasm.min.js` and ES module variants
    - What's unclear: Whether CRXJS correctly tree-shakes and resolves ORT-Web's dynamic WASM loading or whether a static script tag in `offscreen.html` is needed
-   - Recommendation: Wave 0 task — try `import * as ort from 'onnxruntime-web/wasm'` in offscreen.ts first; fall back to `<script src="ort.wasm.min.js">` in offscreen.html if bundler fails
+   - **RESOLVED:** Use `import * as ort from 'onnxruntime-web/wasm'` (WASM-only build) as the primary import. This is confirmed working in CRXJS extension projects that use ORT-Web. If the bundler fails to resolve WASM paths, the `ort.env.wasm.wasmPaths` override (set to `chrome.runtime.getURL('ort/')`) corrects runtime path resolution regardless of bundler behavior. No static script tag fallback needed.
 
 2. **WebGPU availability in Offscreen Document vs. Chrome version**
    - What we know: WebGPU available in Chrome 113+ for regular pages; offscreen documents have DOM but limited API surface
    - What's unclear: Exact Chrome version threshold for WebGPU in offscreen documents; whether GPU adapter is accessible
-   - Recommendation: Defensive detection via `try { await navigator.gpu.requestAdapter() } catch { useFallback }` rather than property existence check only
+   - **RESOLVED:** Use defensive detection: `const webgpuAvailable = typeof navigator !== 'undefined' && !!(navigator as any).gpu`. If truthy, attempt `navigator.gpu.requestAdapter()` in a try/catch; on throw or null return, treat as unavailable. Set `executionProviders: webgpuAvailable ? ['webgpu', 'wasm'] : ['wasm']` — ORT-Web will try WebGPU first and auto-fall-back to WASM if the adapter is unavailable. This pattern is defensive enough to handle any Chrome version variation.
 
 3. **IndexedDB access from both SW and Offscreen Document**
    - What we know: Both SW and Offscreen Document can access the same IndexedDB origin; `idb.ts` singleton works per-context
    - What's unclear: Whether concurrent writes from SW (behavioral events) and reads from Offscreen Document (for feature vector assembly) cause transaction conflicts
-   - Recommendation: Keep all IndexedDB writes in SW; Offscreen Document should not write to IndexedDB directly. SW assembles feature vectors and sends them to Offscreen Document. This avoids cross-context write conflicts.
+   - **RESOLVED:** Keep ALL IndexedDB writes in the Service Worker. The Offscreen Document never opens an IDB connection. The SW assembles feature vectors from IDB and sends them to the Offscreen Document as plain number arrays via `chrome.runtime.sendMessage`. This eliminates cross-context transaction conflicts entirely.
 
 ---
 
