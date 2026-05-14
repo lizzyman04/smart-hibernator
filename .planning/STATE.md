@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-last_updated: "2026-05-14T09:34:00Z"
+last_updated: "2026-05-14T07:53:03.349Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 12
-  completed_plans: 9
-  percent: 75
+  completed_plans: 10
+  percent: 83
 ---
 
 # Project State - Smart Hibernator
@@ -23,11 +23,11 @@ progress:
 ## Current Position
 
 Phase: 03 (ai-intelligence) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 **Phase**: 3 (AI Intelligence)
-**Plan**: 03-01 COMPLETE (1/4 Phase 3 plans done)
+**Plan**: 03-02 COMPLETE (2/4 Phase 3 plans done)
 **Status**: IN_PROGRESS
-**Progress**: [██████████] 100% Phase 1 + [██████████] 100% Phase 2 + [██░░░░░░░░] 25% Phase 3
+**Progress**: [██████████] 100% Phase 1 + [██████████] 100% Phase 2 + [████░░░░░░] 50% Phase 3
 
 ## Performance Metrics
 
@@ -42,6 +42,7 @@ Plan: 2 of 4
 - **01-03 Duration**: 95s | Tasks: 1/1 | Files: 0 created, 1 modified
 - **01-04 Duration**: 977s | Tasks: 2/2 | Files: 2 created, 4 modified
 - **03-01 Duration**: 420s | Tasks: 3/3 | Files: 8 created, 4 modified
+- **03-02 Duration**: 1500s | Tasks: 3/3 | Files: 2 created, 5 modified
 
 ## Accumulated Context
 
@@ -81,6 +82,10 @@ Plan: 2 of 4
 - **Phase 3 Wave 0 — VITAL_DOMAINS preset**: github.com, docs.google.com, notion.so, linear.app, figma.com (D-02 domain heuristics).
 - **Phase 3 Wave 0 — ONNX model**: synthetic Decision Tree committed (max_depth=5, seed=42, 6 float32 features, zipmap=False, 1.1 KB). All downstream waves consume committed artifact; Python not needed at runtime.
 - **Phase 3 Wave 0 — All IndexedDB writes in SW only**: Offscreen Document never opens IDB connection — eliminates cross-context transaction conflicts (RESEARCH.md Q3 resolved).
+- **Phase 3 Wave 1 — vi.hoisted() + vi.doMock() pattern**: vitest-idiomatic way to share mock references between vi.mock() factory and test code; avoids hoisting ReferenceError.
+- **Phase 3 Wave 1 — vitest-chrome callListeners()**: onMessage.addListener is a real event emitter (not vi.fn()); use callListeners() to trigger registered listeners in tests.
+- **Phase 3 Wave 1 — LABEL_ORDER**: ['Dead','Semi-Active','Vital'] matches skl2onnx training label order 0=Dead,1=Semi-Active,2=Vital from scripts/generate-model.py.
+- **Phase 3 Wave 1 — classifier.ts does not apply AI_CONFIDENCE_THRESHOLD**: threshold is applied by hibernation.ts (Wave 3); classifyBatch writes all results including low-confidence ones to storage.
 
 ### Todos
 
@@ -93,6 +98,6 @@ Plan: 2 of 4
 
 ## Session Continuity
 
-**Last Session**: 2026-05-14 — Plan 03-01 (Wave 0 AI foundation) executed. onnxruntime-web + vite-plugin-static-copy installed. manifest.json updated with offscreen permission, wasm-unsafe-eval CSP, 3 new web_accessible_resources. vite.config.ts wired with offscreen entry + viteStaticCopy for dist/ort/. Phase 3 types (TabVitality, ClassificationResult, TabHistoryRecord, DomainBiasRecord) + 8 AI constants added to shared/. chrome.offscreen + getContexts + ContextType shims added to vitest.setup.ts. Synthetic 1.1 KB ONNX Decision Tree committed. Three Wave 0 test stubs created. npm test: 9 files, 44 passing, 10 todo, 0 failures.
-**Next Session**: Execute Phase 3 Plan 02 (Wave 1 — offscreen/main.ts ORT session + classifier.ts feature vector assembly)
-**Resume file**: `.planning/phases/03-ai-intelligence/03-02-PLAN.md`
+**Last Session**: 2026-05-14 — Plan 03-02 (Wave 1 AI inference engine) executed. idb.ts bumped to v2 with tab-history + domain-bias stores + 6 CRUD helpers. offscreen/index.html replaced with real ES module entry. offscreen/main.ts created (ORT-Web session singleton, WebGPU/WASM probe, CLASSIFY_BATCH handler). classifier.ts created (getDomainCategoryBoost, buildFeaturesForTab, ensureOffscreen, classifyBatch). 3 Wave 0 test stubs expanded to real tests. npm test: 9 files, 76 passing, 4 todo, 0 failures.
+**Next Session**: Execute Phase 3 Plan 03 (Wave 2 — ai-learning.ts + hibernation.ts AI integration)
+**Resume file**: `.planning/phases/03-ai-intelligence/03-03-PLAN.md`
