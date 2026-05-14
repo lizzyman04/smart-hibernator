@@ -22,6 +22,7 @@
   "homepage": "https://github.com/lizzyman04/smart-hibernator#readme",
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "onnxruntime-web": "^1.26.0",
     "@fontsource-variable/geist": "^5.2.8",
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-separator": "^1.1.8",
@@ -56,6 +57,7 @@
     "typescript": "6.0.3",
     "vite": "8.0.10",
     "vitest": "4.1.5",
-    "vitest-chrome": "0.1.0"
+    "vitest-chrome": "0.1.0",
+    "vite-plugin-static-copy": "^4.1.0"
   }
 }

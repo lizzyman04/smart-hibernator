@@ -38,7 +38,8 @@
     "alarms",
     "contextMenus",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "offscreen"
   ],
   "icons": {
     "16": "icons/icon16.png",
@@ -50,9 +51,21 @@
     {
       "resources": ["src/dashboard/index.html"],
       "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["src/offscreen/index.html"],
+      "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["ort/*.wasm", "ort/*.mjs"],
+      "matches": ["<all_urls>"]
+    },
+    {
+      "resources": ["src/assets/classifier.onnx"],
+      "matches": ["<all_urls>"]
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; style-src 'self' 'unsafe-inline'"
   }
 }

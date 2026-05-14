@@ -7,15 +7,33 @@ import { crx } from '@crxjs/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
 import manifest from './manifest.json'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 
 export default defineConfig({
   base: './',
-  plugins: [react(), tailwindcss(), crx({ manifest })],
+  plugins: [
+    react(),
+    tailwindcss(),
+    crx({ manifest }),
+    viteStaticCopy({
+      targets: [
+        {
+          src: 'node_modules/onnxruntime-web/dist/*.wasm',
+          dest: 'ort',
+        },
+        {
+          src: 'node_modules/onnxruntime-web/dist/*.mjs',
+          dest: 'ort',
+        },
+      ],
+    }),
+  ],
   build: {
     assetsInlineLimit: 0,
     rollupOptions: {
       input: {
         dashboard: resolve(__dirname, 'src/dashboard/index.html'),
+        offscreen: resolve(__dirname, 'src/offscreen/index.html'),
       },
     },
   },
