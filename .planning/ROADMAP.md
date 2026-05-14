@@ -52,7 +52,7 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md — Wave 1: Foundation (ORT deps, manifest CSP, vite static-copy, types/constants, ONNX model, test stubs)
 - [x] 03-02-PLAN.md — Wave 2: Offscreen Document + classifier.ts + idb.ts v2 (tab-history, domain-bias)
-- [ ] 03-03-PLAN.md — Wave 3: ai-learning.ts + isDiscardable AI integration + SW behavioral hooks + KEEP_ALIVE
+- [x] 03-03-PLAN.md — Wave 3: ai-learning.ts + isDiscardable AI integration + SW behavioral hooks + KEEP_ALIVE
 - [ ] 03-04-PLAN.md — Wave 4: Popup V/S/D pill + Keep Alive button + Dashboard AI summary
 
 ### Phase 4: Perfect State Restoration
@@ -83,6 +83,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Core Hibernation Engine | 4/4 | Complete | 01-01, 01-02, 01-03, 01-04 done (2026-04-30) |
 | 2. UI & Rich Previews | 4/4 | Complete | 02-01, 02-02, 02-03, 02-04 done (2026-05-03) |
-| 3. AI Intelligence | 2/4 | In Progress|  |
+| 3. AI Intelligence | 3/4 | In Progress|  |
 | 4. Perfect State Restoration | 0/1 | Not started | - |
 | 5. Polishing & Launch | 0/1 | Not started | - |
