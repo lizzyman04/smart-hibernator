@@ -173,6 +173,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     message.type === 'KEEP_ALIVE' &&
     typeof message.tabId === 'number' &&
     typeof message.domain === 'string' &&
+    message.domain.length > 0 &&
     message.domain.length < 256
   ) {
     recordKeepAlive(message.tabId as number, message.domain as string).catch(() => {})
