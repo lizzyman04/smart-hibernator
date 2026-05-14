@@ -1,7 +1,21 @@
-// Covers FR-08 IDB CRUD + eviction contract
+// Covers FR-08 IDB CRUD + eviction contract (Phase 2 thumbnails)
+// Covers FR-06 IDB CRUD contract (Phase 3 tab-history + domain-bias stores)
 import { describe, it, expect, beforeEach } from 'vitest'
-import { putThumbnail, getThumbnail, deleteThumbnail, getAllThumbnails, pruneIfNeeded } from './idb'
+import {
+  putThumbnail,
+  getThumbnail,
+  deleteThumbnail,
+  getAllThumbnails,
+  pruneIfNeeded,
+  appendTabHistory,
+  getTabHistoryByDomain,
+  countTabHistory,
+  pruneTabHistory,
+  getDomainBias,
+  putDomainBias,
+} from './idb'
 import type { ThumbnailRecord } from './idb'
+import type { TabHistoryRecord, DomainBiasRecord } from '../shared/types'
 import { IDB_SIZE_CAP_BYTES } from '../shared/constants'
 
 // fake-indexeddb/auto is imported in vitest.setup.ts — global indexedDB is available
@@ -12,6 +26,30 @@ function makeThumbnail(overrides: Partial<ThumbnailRecord> = {}): ThumbnailRecor
     url: 'https://example.com',
     dataUrl: 'data:image/webp;base64,ABC',
     capturedAt: Date.now(),
+    ...overrides,
+  }
+}
+
+function makeHistoryRecord(overrides: Partial<TabHistoryRecord> = {}): TabHistoryRecord {
+  return {
+    domain: 'example.com',
+    url: 'https://example.com/page',
+    visitStart: Date.now() - 5000,
+    visitEnd: Date.now(),
+    dwellMs: 5000,
+    hadFormActivity: false,
+    timestamp: Date.now() - 5000,
+    ...overrides,
+  }
+}
+
+function makeBiasRecord(overrides: Partial<DomainBiasRecord> = {}): DomainBiasRecord {
+  return {
+    domain: 'example.com',
+    biasOffset: 0.5,
+    keepAliveCount: 1,
+    misclassificationCount: 0,
+    updatedAt: Date.now(),
     ...overrides,
   }
 }
@@ -60,5 +98,77 @@ describe('idb CRUD (FR-08)', () => {
     expect(await getThumbnail(200)).toBeUndefined()
     // The newer entry (tabId 201, capturedAt 2000) should remain
     expect(await getThumbnail(201)).toBeDefined()
+  })
+})
+
+describe('tab-history CRUD (FR-06)', () => {
+  beforeEach(async () => {
+    // Prune any rows from previous tests using a future cutoff
+    await pruneTabHistory(Date.now() + 1_000_000)
+  })
+
+  it('appendTabHistory + getTabHistoryByDomain returns rows for matching domain within window', async () => {
+    const now = Date.now()
+    const record = makeHistoryRecord({ domain: 'github.com', timestamp: now - 1000 })
+    await appendTabHistory(record)
+    const rows = await getTabHistoryByDomain('github.com', now - 60_000)
+    expect(rows.length).toBeGreaterThanOrEqual(1)
+    expect(rows[0].domain).toBe('github.com')
+  })
+
+  it('getTabHistoryByDomain filters out rows older than since timestamp', async () => {
+    const ancient = Date.now() - 100_000
+    await appendTabHistory(makeHistoryRecord({ domain: 'old.com', timestamp: ancient }))
+    // Query with since = now - 1000 (recent window only)
+    const rows = await getTabHistoryByDomain('old.com', Date.now() - 1000)
+    expect(rows.length).toBe(0)
+  })
+
+  it('countTabHistory returns total row count', async () => {
+    const beforeCount = await countTabHistory()
+    await appendTabHistory(makeHistoryRecord({ domain: 'count-test.com' }))
+    await appendTabHistory(makeHistoryRecord({ domain: 'count-test.com' }))
+    const afterCount = await countTabHistory()
+    expect(afterCount).toBe(beforeCount + 2)
+  })
+
+  it('pruneTabHistory deletes rows older than cutoff', async () => {
+    const cutoffMs = Date.now() - 1000
+    // Insert one old row (before cutoff) and one new row (after cutoff)
+    const oldTs = cutoffMs - 500
+    const newTs = Date.now()
+    await appendTabHistory(makeHistoryRecord({ domain: 'prune-test.com', timestamp: oldTs }))
+    await appendTabHistory(makeHistoryRecord({ domain: 'prune-test.com', timestamp: newTs }))
+    await pruneTabHistory(cutoffMs)
+    // Old row should be gone; new row should remain
+    const remaining = await getTabHistoryByDomain('prune-test.com', 0)
+    expect(remaining.every((r) => r.timestamp > cutoffMs)).toBe(true)
+    expect(remaining.some((r) => r.timestamp === newTs)).toBe(true)
+  })
+})
+
+describe('domain-bias CRUD (FR-06)', () => {
+  it('putDomainBias + getDomainBias round-trip preserves all fields', async () => {
+    const record = makeBiasRecord({ domain: 'bias-test.com', biasOffset: 0.75, keepAliveCount: 3, misclassificationCount: 1 })
+    await putDomainBias(record)
+    const retrieved = await getDomainBias('bias-test.com')
+    expect(retrieved).toBeDefined()
+    expect(retrieved!.domain).toBe('bias-test.com')
+    expect(retrieved!.biasOffset).toBe(0.75)
+    expect(retrieved!.keepAliveCount).toBe(3)
+    expect(retrieved!.misclassificationCount).toBe(1)
+    expect(retrieved!.updatedAt).toBe(record.updatedAt)
+  })
+
+  it('getDomainBias returns undefined for unknown domain', async () => {
+    const result = await getDomainBias('unknown-domain-xyz.com')
+    expect(result).toBeUndefined()
+  })
+
+  it('putDomainBias overwrites existing record for the same domain', async () => {
+    await putDomainBias(makeBiasRecord({ domain: 'overwrite.com', biasOffset: 0.1 }))
+    await putDomainBias(makeBiasRecord({ domain: 'overwrite.com', biasOffset: 0.9 }))
+    const result = await getDomainBias('overwrite.com')
+    expect(result!.biasOffset).toBe(0.9)
   })
 })
