@@ -1,7 +1,8 @@
 import type { TabMeta, HibernationEvent, ClassificationResult } from '../shared/types'
-import { FORM_PROTECTION_MS, AI_CONFIDENCE_THRESHOLD } from '../shared/constants'
+import { FORM_PROTECTION_MS, AI_CONFIDENCE_THRESHOLD, AI_HISTORY_WINDOW_MS } from '../shared/constants'
 import { updateBadge } from './badge'
 import { classifyBatch } from './classifier'
+import { pruneTabHistory } from './idb'
 
 export function isDiscardable(
   tab: chrome.tabs.Tab,
@@ -144,6 +145,14 @@ export async function handleAlarmTick(): Promise<void> {
     const freshCount = ((fresh['hibernated_count'] as number) ?? 0) + newDiscards
     await chrome.storage.local.set({ hibernated_count: freshCount })
     await updateBadge(freshCount)
+  }
+
+  // WR-01: Prune tab-history rows older than the 14-day rolling window on every alarm tick.
+  // Best-effort — failure must not interrupt the hibernation cycle.
+  try {
+    await pruneTabHistory(Date.now() - AI_HISTORY_WINDOW_MS)
+  } catch {
+    // Silently continue — IDB error should not block hibernation
   }
 }
 
