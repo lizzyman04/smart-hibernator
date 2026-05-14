@@ -32,15 +32,19 @@ async function getSession(): Promise<ort.InferenceSession> {
       const modelBuffer = await fetch(modelUrl).then((r) => r.arrayBuffer())
 
       // WebGPU primary, WASM fallback per NFR-03
-      const webgpuAvailable = typeof navigator !== 'undefined' && !!(navigator as any).gpu
+      const webgpuAvailable = typeof navigator !== 'undefined' && 'gpu' in navigator
       const eps = webgpuAvailable ? ['webgpu', 'wasm'] : ['wasm']
 
       session = await ort.InferenceSession.create(modelBuffer, {
         executionProviders: eps,
       })
     })()
-    await sessionInit
-    sessionInit = null
+    try {
+      await sessionInit
+    } finally {
+      // Always reset so the next call can retry on failure (CR-01)
+      sessionInit = null
+    }
   } else {
     await sessionInit
   }
