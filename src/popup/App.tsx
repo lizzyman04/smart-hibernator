@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Moon, Loader2, Globe, ExternalLink } from 'lucide-react'
+import { Moon, Loader2, Globe, ExternalLink, Shield } from 'lucide-react'
 import { Switch } from '../components/ui/switch'
 import { Button } from '../components/ui/button'
 import { Separator } from '../components/ui/separator'
+import { Badge } from '../components/ui/badge'
+import { cn } from '../lib/utils'
 import { getThumbnail, deleteThumbnail } from '../background/idb'
+import type { ClassificationResult } from '../shared/types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -14,6 +17,7 @@ interface HibernatedTabRow {
   domain: string
   favIconUrl: string | undefined
   dataUrl: string | undefined
+  classification: ClassificationResult | undefined
 }
 
 interface PopupState {
@@ -25,6 +29,7 @@ interface PopupState {
   isHibernating: boolean
   hibernatedTabs: HibernatedTabRow[]
   wakingTabId: number | null
+  aiClassifications: Record<number, ClassificationResult>
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -39,6 +44,7 @@ export default function App() {
     isHibernating: false,
     hibernatedTabs: [],
     wakingTabId: null,
+    aiClassifications: {},
   })
 
   useEffect(() => {
@@ -49,12 +55,13 @@ export default function App() {
       const isDiscarded = tab.discarded ?? false
 
       chrome.storage.local.get(
-        ['hibernation_enabled', 'hibernated_count', 'protected_tabs'],
+        ['hibernation_enabled', 'hibernated_count', 'protected_tabs', 'ai_classifications'],
         (result) => {
           const hibernationEnabled = (result['hibernation_enabled'] as boolean) ?? true
           const hibernatedCount = (result['hibernated_count'] as number) ?? 0
           const protectedTabs = (result['protected_tabs'] as number[]) ?? []
           const isProtected = protectedTabs.includes(tabId)
+          const aiClassifications = (result['ai_classifications'] as Record<number, ClassificationResult>) ?? {}
 
           setState((prev) => ({
             ...prev,
@@ -63,14 +70,22 @@ export default function App() {
             isCurrentTabProtected: isProtected,
             isCurrentTabDiscarded: isDiscarded,
             currentTabId: tabId,
+            aiClassifications,
           }))
         }
       )
     })
 
-    // Load hibernated tab list (FR-09)
+    // Load hibernated tab list (FR-09) — reads ai_classifications from storage to attach classification per row
     async function loadHibernatedTabs() {
       const discardedTabs = await chrome.tabs.query({ discarded: true })
+
+      // Fetch ai_classifications fresh to avoid race with the current-tab storage.get above
+      const storageResult = await new Promise<Record<string, unknown>>((resolve) => {
+        chrome.storage.local.get('ai_classifications', (result) => resolve(result))
+      })
+      const aiClassifications = (storageResult['ai_classifications'] as Record<number, ClassificationResult>) ?? {}
+
       const rows: HibernatedTabRow[] = await Promise.all(
         discardedTabs.map(async (tab) => {
           const record = tab.id ? await getThumbnail(tab.id) : undefined
@@ -81,10 +96,11 @@ export default function App() {
             domain: tab.url ? (() => { try { return new URL(tab.url!).hostname } catch { return '' } })() : '',
             favIconUrl: tab.favIconUrl,
             dataUrl: record?.dataUrl,
+            classification: aiClassifications[tab.id!],
           }
         })
       )
-      setState((prev) => ({ ...prev, hibernatedTabs: rows }))
+      setState((prev) => ({ ...prev, hibernatedTabs: rows, aiClassifications }))
     }
     loadHibernatedTabs().catch(() => { /* silently ignore — popup closed before query resolves */ })
 
@@ -108,6 +124,17 @@ export default function App() {
               : false,
           }
         })
+      }
+      if ('ai_classifications' in changes) {
+        const aiClassifications = (changes['ai_classifications'].newValue as Record<number, ClassificationResult>) ?? {}
+        setState((prev) => ({
+          ...prev,
+          aiClassifications,
+          hibernatedTabs: prev.hibernatedTabs.map((t) => ({
+            ...t,
+            classification: aiClassifications[t.id],
+          })),
+        }))
       }
 
       if (Object.keys(updates).length > 0) {
@@ -165,6 +192,10 @@ export default function App() {
     } catch {
       setState((prev) => ({ ...prev, wakingTabId: null }))
     }
+  }
+
+  function handleKeepAlive(tabId: number, domain: string): void {
+    chrome.runtime.sendMessage({ type: 'KEEP_ALIVE', tabId, domain }).catch(() => {})
   }
 
   function handleOpenDashboard() {
@@ -241,7 +272,7 @@ export default function App() {
 
       <Separator className="bg-zinc-800 h-px w-full" />
 
-      {/* Hibernated Tab List (NEW — FR-09, D-03) */}
+      {/* Hibernated Tab List (FR-09, D-03) */}
       <div className="flex flex-col overflow-y-auto max-h-[220px]">
         {state.hibernatedTabs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 gap-1">
@@ -280,6 +311,53 @@ export default function App() {
                 <span className="text-xs font-normal text-zinc-400 truncate">{tab.domain}</span>
               </div>
 
+              {/* V/S/D pill badge — T-03-16 strict switch; no pill on null/undefined (D-12) */}
+              {tab.classification?.label === 'Vital' && (
+                <Badge
+                  className={cn(
+                    'h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px] font-semibold shrink-0',
+                    'bg-green-600 border-green-500 text-white'
+                  )}
+                  title="Vital"
+                >
+                  V
+                </Badge>
+              )}
+              {tab.classification?.label === 'Semi-Active' && (
+                <Badge
+                  className={cn(
+                    'h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px] font-semibold shrink-0',
+                    'bg-amber-500 border-amber-400 text-white'
+                  )}
+                  title="Semi-Active"
+                >
+                  S
+                </Badge>
+              )}
+              {tab.classification?.label === 'Dead' && (
+                <Badge
+                  className={cn(
+                    'h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px] font-semibold shrink-0',
+                    'bg-zinc-600 border-zinc-500 text-zinc-300'
+                  )}
+                  title="Dead"
+                >
+                  D
+                </Badge>
+              )}
+
+              {/* Keep Alive button — FR-06/D-14; distinct from Wake Tab (T-03-18) */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleKeepAlive(tab.id, tab.domain)}
+                className="h-8 px-2 bg-zinc-800 border border-zinc-700 text-zinc-50 hover:bg-green-900 active:bg-green-800 text-xs font-normal shrink-0"
+                title="Mark as important — teaches AI this domain is vital"
+                aria-label={`Keep alive ${tab.domain}`}
+              >
+                <Shield className="w-3 h-3" /> Keep
+              </Button>
+
               {/* Wake Tab button */}
               <Button
                 variant="outline"
@@ -313,7 +391,7 @@ export default function App() {
         )}
       </div>
 
-      {/* Dashboard footer link (NEW — D-05) */}
+      {/* Dashboard footer link (D-05) */}
       <div className="flex items-center justify-center pt-2">
         <Button
           variant="ghost"
