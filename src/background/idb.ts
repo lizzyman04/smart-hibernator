@@ -49,9 +49,13 @@ function getDb(): Promise<IDBPDatabase<SmartHibernatorDB>> {
       blocked() {
         console.warn('[smart-hibernator] IDB upgrade blocked — close other extension tabs')
       },
-      blocking() {
-        // Close our connection so the other context can upgrade
+      blocking(_currentVersion, _blockedVersion, event) {
+        // Nullify our cached promise so the next getDb() call re-opens
         dbPromise = null
+        // Actually close the IDBDatabase connection so the other context's
+        // upgrade can proceed — setting dbPromise=null alone does not close
+        // the underlying connection (CR-03)
+        ;(event.target as IDBDatabase).close()
       },
     })
   }
