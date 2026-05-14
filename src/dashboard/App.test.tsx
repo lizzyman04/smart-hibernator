@@ -13,6 +13,8 @@ describe('Dashboard App (FR-10)', () => {
           hibernation_events: [],
           timeout_minutes: 45,
           protected_domains: [],
+          ai_classifications: {},
+          ai_install_date: Date.now(),
         })
       }
       return Promise.resolve({})
@@ -40,7 +42,7 @@ describe('Dashboard App (FR-10)', () => {
   it('Stats tab: hero metric shows "~300 MB" when hibernatedCount is 2', async () => {
     vi.mocked(chrome.storage.local.get).mockImplementation((_keys, cb) => {
       if (typeof cb === 'function') {
-        cb({ hibernated_count: 2, hibernation_events: [], timeout_minutes: 45, protected_domains: [] })
+        cb({ hibernated_count: 2, hibernation_events: [], timeout_minutes: 45, protected_domains: [], ai_classifications: {}, ai_install_date: Date.now() })
       }
       return Promise.resolve({})
     })
@@ -54,7 +56,7 @@ describe('Dashboard App (FR-10)', () => {
   it('Settings tab: timeout label shows value from storage (60 minutes)', async () => {
     vi.mocked(chrome.storage.local.get).mockImplementation((_keys, cb) => {
       if (typeof cb === 'function') {
-        cb({ hibernated_count: 0, hibernation_events: [], timeout_minutes: 60, protected_domains: [] })
+        cb({ hibernated_count: 0, hibernation_events: [], timeout_minutes: 60, protected_domains: [], ai_classifications: {}, ai_install_date: Date.now() })
       }
       return Promise.resolve({})
     })
@@ -110,7 +112,7 @@ describe('Dashboard App (FR-10)', () => {
   it('Settings tab: handleAddDomain rejects duplicate — shows error', async () => {
     vi.mocked(chrome.storage.local.get).mockImplementation((_keys, cb) => {
       if (typeof cb === 'function') {
-        cb({ hibernated_count: 0, hibernation_events: [], timeout_minutes: 45, protected_domains: ['github.com'] })
+        cb({ hibernated_count: 0, hibernation_events: [], timeout_minutes: 45, protected_domains: ['github.com'], ai_classifications: {}, ai_install_date: Date.now() })
       }
       return Promise.resolve({})
     })
@@ -133,7 +135,7 @@ describe('Dashboard App (FR-10)', () => {
   it('Settings tab: remove chip calls chrome.storage.local.set with domain removed', async () => {
     vi.mocked(chrome.storage.local.get).mockImplementation((_keys, cb) => {
       if (typeof cb === 'function') {
-        cb({ hibernated_count: 0, hibernation_events: [], timeout_minutes: 45, protected_domains: ['github.com'] })
+        cb({ hibernated_count: 0, hibernation_events: [], timeout_minutes: 45, protected_domains: ['github.com'], ai_classifications: {}, ai_install_date: Date.now() })
       }
       return Promise.resolve({})
     })
@@ -150,5 +152,139 @@ describe('Dashboard App (FR-10)', () => {
         expect.objectContaining({ protected_domains: [] })
       )
     })
+  })
+
+  // ─── Phase 3: AI Classification section tests (FR-05/D-13, FR-06) ─────────
+
+  it('FR-05/D-13: Stats tab AI Classification section shows V S D counts', async () => {
+    vi.mocked(chrome.storage.local.get).mockImplementation((_keys, cb) => {
+      if (typeof cb === 'function') {
+        cb({
+          hibernated_count: 0,
+          hibernation_events: [],
+          timeout_minutes: 45,
+          protected_domains: [],
+          ai_classifications: {
+            1: { label: 'Vital', confidence: 0.9, cachedAt: 0 },
+            2: { label: 'Semi-Active', confidence: 0.7, cachedAt: 0 },
+            3: { label: 'Dead', confidence: 0.8, cachedAt: 0 },
+            4: { label: 'Vital', confidence: 0.95, cachedAt: 0 },
+          },
+          ai_install_date: Date.now(),
+        })
+      }
+      return Promise.resolve({})
+    })
+    const { default: App } = await import('./App')
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByText('AI Classification')).toBeInTheDocument()
+    })
+    // Labels are present
+    expect(screen.getByText('Vital')).toBeInTheDocument()
+    expect(screen.getByText('Semi-Active')).toBeInTheDocument()
+    expect(screen.getByText('Dead')).toBeInTheDocument()
+    // Counts: 2 Vital, 1 Semi-Active, 1 Dead
+    // Use getAllByText to handle any collisions with existing content
+    const twos = screen.getAllByText('2')
+    expect(twos.length).toBeGreaterThanOrEqual(1)
+    const ones = screen.getAllByText('1')
+    expect(ones.length).toBeGreaterThanOrEqual(2) // 1 Semi-Active, 1 Dead
+  })
+
+  it('FR-06/D-13: shows "AI tuning: N days remaining" when ai_install_date is recent', async () => {
+    const fiveDaysAgo = Date.now() - 5 * 24 * 3600 * 1000
+    vi.mocked(chrome.storage.local.get).mockImplementation((_keys, cb) => {
+      if (typeof cb === 'function') {
+        cb({
+          hibernated_count: 0,
+          hibernation_events: [],
+          timeout_minutes: 45,
+          protected_domains: [],
+          ai_classifications: {},
+          ai_install_date: fiveDaysAgo,
+        })
+      }
+      return Promise.resolve({})
+    })
+    const { default: App } = await import('./App')
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByText('AI tuning: 9 days remaining')).toBeInTheDocument()
+    })
+  })
+
+  it('FR-06/D-13: shows "AI tuned" when daysSinceInstall >= AI_LEARNING_DAYS', async () => {
+    const fifteenDaysAgo = Date.now() - 15 * 24 * 3600 * 1000
+    vi.mocked(chrome.storage.local.get).mockImplementation((_keys, cb) => {
+      if (typeof cb === 'function') {
+        cb({
+          hibernated_count: 0,
+          hibernation_events: [],
+          timeout_minutes: 45,
+          protected_domains: [],
+          ai_classifications: {},
+          ai_install_date: fifteenDaysAgo,
+        })
+      }
+      return Promise.resolve({})
+    })
+    const { default: App } = await import('./App')
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByText('AI tuned')).toBeInTheDocument()
+    })
+  })
+
+  it('FR-06/D-13: AI summary handles empty ai_classifications (cold start)', async () => {
+    vi.mocked(chrome.storage.local.get).mockImplementation((_keys, cb) => {
+      if (typeof cb === 'function') {
+        cb({
+          hibernated_count: 0,
+          hibernation_events: [],
+          timeout_minutes: 45,
+          protected_domains: [],
+          ai_classifications: {},
+          ai_install_date: Date.now(),
+        })
+      }
+      return Promise.resolve({})
+    })
+    const { default: App } = await import('./App')
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByText('AI Classification')).toBeInTheDocument()
+    })
+    // All counts should be zero — tabular-nums spans within the AI section
+    // Use getAllByText('0') since the hibernated count also shows 0
+    const zeros = screen.getAllByText('0')
+    // At least 3 zeros for V/S/D counts
+    expect(zeros.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('FR-05: AI summary ignores classification entries with label === null (cold start per tab)', async () => {
+    vi.mocked(chrome.storage.local.get).mockImplementation((_keys, cb) => {
+      if (typeof cb === 'function') {
+        cb({
+          hibernated_count: 0,
+          hibernation_events: [],
+          timeout_minutes: 45,
+          protected_domains: [],
+          ai_classifications: {
+            1: { label: null, confidence: 0, cachedAt: 0 },
+          },
+          ai_install_date: Date.now(),
+        })
+      }
+      return Promise.resolve({})
+    })
+    const { default: App } = await import('./App')
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByText('AI Classification')).toBeInTheDocument()
+    })
+    // Counts should all still be 0 (null label is ignored)
+    const zeros = screen.getAllByText('0')
+    expect(zeros.length).toBeGreaterThanOrEqual(3)
   })
 })

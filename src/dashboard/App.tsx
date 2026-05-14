@@ -13,8 +13,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import type { HibernationEvent } from '../shared/types'
-import { RAM_PER_TAB_MB } from '../shared/constants'
+import type { HibernationEvent, ClassificationResult } from '../shared/types'
+import { RAM_PER_TAB_MB, AI_LEARNING_DAYS } from '../shared/constants'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -26,6 +26,8 @@ interface DashboardState {
   domainInput: string
   domainError: string
   isRefreshing: boolean
+  aiClassifications: Record<number, ClassificationResult>
+  aiInstallDate: number
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
@@ -53,12 +55,15 @@ export default function App() {
     domainInput: '',
     domainError: '',
     isRefreshing: false,
+    aiClassifications: {},
+    aiInstallDate: Date.now(),
   })
 
   useEffect(() => {
     // Poll storage on mount (D-09)
     chrome.storage.local.get(
-      ['hibernated_count', 'hibernation_events', 'timeout_minutes', 'protected_domains'],
+      ['hibernated_count', 'hibernation_events', 'timeout_minutes', 'protected_domains',
+       'ai_classifications', 'ai_install_date'],
       (result) => {
         setState((prev) => ({
           ...prev,
@@ -66,6 +71,8 @@ export default function App() {
           hibernationEvents: (result['hibernation_events'] as HibernationEvent[]) ?? [],
           timeoutMinutes: (result['timeout_minutes'] as number) ?? 45,
           protectedDomains: (result['protected_domains'] as string[]) ?? [],
+          aiClassifications: (result['ai_classifications'] as Record<number, ClassificationResult>) ?? {},
+          aiInstallDate: (result['ai_install_date'] as number) ?? Date.now(),
         }))
       }
     )
@@ -81,6 +88,10 @@ export default function App() {
         updates.timeoutMinutes = changes['timeout_minutes'].newValue as number
       if ('protected_domains' in changes)
         updates.protectedDomains = changes['protected_domains'].newValue as string[]
+      if ('ai_classifications' in changes)
+        updates.aiClassifications = (changes['ai_classifications'].newValue as Record<number, ClassificationResult>) ?? {}
+      if ('ai_install_date' in changes)
+        updates.aiInstallDate = changes['ai_install_date'].newValue as number
       if (Object.keys(updates).length > 0)
         setState((prev) => ({ ...prev, ...updates }))
     }
@@ -146,6 +157,14 @@ export default function App() {
 
   const ramFreedMB = state.hibernatedCount * RAM_PER_TAB_MB
   const chartData = buildChartData(state.hibernationEvents)
+
+  // AI Classification derived data (D-13, T-03-16 strict label filter)
+  const classifications = Object.values(state.aiClassifications)
+  const vitalCount = classifications.filter((c) => c.label === 'Vital').length
+  const semiCount = classifications.filter((c) => c.label === 'Semi-Active').length
+  const deadCount = classifications.filter((c) => c.label === 'Dead').length
+  const daysSinceInstall = Math.floor((Date.now() - state.aiInstallDate) / (24 * 3600 * 1000))
+  const daysRemaining = Math.max(0, AI_LEARNING_DAYS - daysSinceInstall)
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -216,6 +235,49 @@ export default function App() {
                   <Bar dataKey="count" fill="#F59E0B" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+
+            {/* AI Classification section (Phase 3 — D-13, FR-05, FR-06) */}
+            <div className="bg-zinc-900 rounded-xl p-6 border border-white/10 mt-4">
+              <h2 className="text-xl font-semibold text-zinc-50 mb-4">AI Classification</h2>
+
+              {/* V/S/D count row */}
+              <div className="flex items-center gap-6 mb-4">
+                <div className="flex items-center gap-2">
+                  <Badge
+                    className="h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px] font-semibold bg-green-600 border-green-500 text-white"
+                  >
+                    V
+                  </Badge>
+                  <span className="text-sm font-normal text-zinc-50 tabular-nums">{vitalCount}</span>
+                  <span className="text-xs text-zinc-400">Vital</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    className="h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px] font-semibold bg-amber-500 border-amber-400 text-white"
+                  >
+                    S
+                  </Badge>
+                  <span className="text-sm font-normal text-zinc-50 tabular-nums">{semiCount}</span>
+                  <span className="text-xs text-zinc-400">Semi-Active</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    className="h-5 w-5 p-0 flex items-center justify-center rounded-full text-[10px] font-semibold bg-zinc-600 border-zinc-500 text-zinc-300"
+                  >
+                    D
+                  </Badge>
+                  <span className="text-sm font-normal text-zinc-50 tabular-nums">{deadCount}</span>
+                  <span className="text-xs text-zinc-400">Dead</span>
+                </div>
+              </div>
+
+              {/* Learning countdown (FR-06) */}
+              <p className="text-xs font-normal text-zinc-400 mt-4">
+                {daysRemaining > 0
+                  ? `AI tuning: ${daysRemaining} days remaining`
+                  : 'AI tuned'}
+              </p>
             </div>
 
             {/* Refresh thumbnails button (D-14) */}
