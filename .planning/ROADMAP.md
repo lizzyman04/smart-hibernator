@@ -50,7 +50,7 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Wave 1: Foundation (ORT deps, manifest CSP, vite static-copy, types/constants, ONNX model, test stubs)
+- [x] 03-01-PLAN.md — Wave 1: Foundation (ORT deps, manifest CSP, vite static-copy, types/constants, ONNX model, test stubs)
 - [ ] 03-02-PLAN.md — Wave 2: Offscreen Document + classifier.ts + idb.ts v2 (tab-history, domain-bias)
 - [ ] 03-03-PLAN.md — Wave 3: ai-learning.ts + isDiscardable AI integration + SW behavioral hooks + KEEP_ALIVE
 - [ ] 03-04-PLAN.md — Wave 4: Popup V/S/D pill + Keep Alive button + Dashboard AI summary

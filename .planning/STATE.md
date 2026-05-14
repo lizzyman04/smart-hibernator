@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-last_updated: "2026-05-12T14:00:07.050Z"
+last_updated: "2026-05-14T09:34:00Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 12
-  completed_plans: 8
-  percent: 67
+  completed_plans: 9
+  percent: 75
 ---
 
 # Project State - Smart Hibernator
@@ -22,10 +22,12 @@ progress:
 
 ## Current Position
 
-**Phase**: 2 (UI & Rich Previews)
-**Plan**: 02-04 COMPLETE (4/4 Phase 2 plans done)
+Phase: 03 (ai-intelligence) — EXECUTING
+Plan: 2 of 4
+**Phase**: 3 (AI Intelligence)
+**Plan**: 03-01 COMPLETE (1/4 Phase 3 plans done)
 **Status**: IN_PROGRESS
-**Progress**: [██████████] 100% Phase 1 + [██████████] 100% Phase 2
+**Progress**: [██████████] 100% Phase 1 + [██████████] 100% Phase 2 + [██░░░░░░░░] 25% Phase 3
 
 ## Performance Metrics
 
@@ -39,6 +41,7 @@ progress:
 - **01-02 Duration**: 76s | Tasks: 1/1 | Files: 0 created, 1 modified
 - **01-03 Duration**: 95s | Tasks: 1/1 | Files: 0 created, 1 modified
 - **01-04 Duration**: 977s | Tasks: 2/2 | Files: 2 created, 4 modified
+- **03-01 Duration**: 420s | Tasks: 3/3 | Files: 8 created, 4 modified
 
 ## Accumulated Context
 
@@ -73,6 +76,11 @@ progress:
 - **Radix Tabs JSDOM activation**: `fireEvent.mouseDown(tab, {button:0, ctrlKey:false})` required to switch tabs in tests — Radix UI Tabs v1.x listens to `onMouseDown`, not `onClick`. `fireEvent.click` alone does not trigger tab switching.
 - **ResizeObserver polyfill**: Added `ResizeObserverStub` to `vitest.setup.ts` — Recharts `ResponsiveContainer` requires it; JSDOM does not implement it.
 - **Phase 2 — Empty string via protocol-only input**: Use `'https://'` to test empty-domain validation when button `disabled={!domainInput.trim()}` — it strips to `''` after regex, triggering the error path while keeping button enabled.
+- **Phase 3 Wave 0 — AI_CONFIDENCE_THRESHOLD**: 0.6 selected (D-07 — Claude's discretion; ~0.6 suggested in CONTEXT.md). Classifier falls back to base timeout when confidence < 0.6.
+- **Phase 3 Wave 0 — AI_COLD_START_MIN_SAMPLES**: 50 rows in tab-history before AI activates (Pitfall 5 — all-zeros features would produce garbage classifications on first install).
+- **Phase 3 Wave 0 — VITAL_DOMAINS preset**: github.com, docs.google.com, notion.so, linear.app, figma.com (D-02 domain heuristics).
+- **Phase 3 Wave 0 — ONNX model**: synthetic Decision Tree committed (max_depth=5, seed=42, 6 float32 features, zipmap=False, 1.1 KB). All downstream waves consume committed artifact; Python not needed at runtime.
+- **Phase 3 Wave 0 — All IndexedDB writes in SW only**: Offscreen Document never opens IDB connection — eliminates cross-context transaction conflicts (RESEARCH.md Q3 resolved).
 
 ### Todos
 
@@ -85,6 +93,6 @@ progress:
 
 ## Session Continuity
 
-**Last Session**: 2026-05-03 — Plan 02-04 (Wave 4 Dashboard) executed. Dashboard created: index.html, index.css, main.tsx scaffold + App.tsx (Stats tab with hero metric/Recharts BarChart/Refresh button, Settings tab with Slider/domain whitelist). CAPTURE_TAB handler added to index.ts. ResizeObserver polyfill added to vitest.setup.ts. 8 behavioral tests GREEN. npm test: 6 files, 39 passing, 0 todo, 0 failures. Phase 2 complete.
-**Next Session**: Execute Phase 3 (AI Intelligence) — ONNX Runtime, tab vitality classification
-**Resume file**: `.planning/ROADMAP.md`
+**Last Session**: 2026-05-14 — Plan 03-01 (Wave 0 AI foundation) executed. onnxruntime-web + vite-plugin-static-copy installed. manifest.json updated with offscreen permission, wasm-unsafe-eval CSP, 3 new web_accessible_resources. vite.config.ts wired with offscreen entry + viteStaticCopy for dist/ort/. Phase 3 types (TabVitality, ClassificationResult, TabHistoryRecord, DomainBiasRecord) + 8 AI constants added to shared/. chrome.offscreen + getContexts + ContextType shims added to vitest.setup.ts. Synthetic 1.1 KB ONNX Decision Tree committed. Three Wave 0 test stubs created. npm test: 9 files, 44 passing, 10 todo, 0 failures.
+**Next Session**: Execute Phase 3 Plan 02 (Wave 1 — offscreen/main.ts ORT session + classifier.ts feature vector assembly)
+**Resume file**: `.planning/phases/03-ai-intelligence/03-02-PLAN.md`
