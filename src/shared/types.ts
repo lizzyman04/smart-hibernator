@@ -9,6 +9,35 @@ export interface HibernationEvent {
   url: string
 }
 
+// Phase 3 — AI Intelligence type definitions
+
+export type TabVitality = 'Vital' | 'Semi-Active' | 'Dead'
+
+export interface ClassificationResult {
+  label: TabVitality | null
+  confidence: number
+  cachedAt: number
+}
+
+export interface TabHistoryRecord {
+  id?: number
+  domain: string
+  url: string
+  visitStart: number
+  visitEnd: number
+  dwellMs: number
+  hadFormActivity: boolean
+  timestamp: number
+}
+
+export interface DomainBiasRecord {
+  domain: string
+  biasOffset: number
+  keepAliveCount: number
+  misclassificationCount: number
+  updatedAt: number
+}
+
 export interface StorageSchema {
   hibernation_enabled: boolean
   hibernated_count: number
@@ -17,6 +46,8 @@ export interface StorageSchema {
   protected_domains: string[]
   timeout_minutes: number              // Phase 2 — default 45; user-configurable
   hibernation_events: HibernationEvent[]  // Phase 2 — for 7-day chart; max 7 days retained
+  ai_classifications: Record<number, ClassificationResult>  // Phase 3 — per-tab classification cache
+  ai_install_date: number              // Phase 3 — unix ms; used for cold-start countdown
 }
 
 export type StorageKey = keyof StorageSchema

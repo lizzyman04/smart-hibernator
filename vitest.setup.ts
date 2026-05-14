@@ -20,6 +20,25 @@ const chromeMV3Action = {
 
 Object.assign(global, { chrome: { ...chrome, action: chromeMV3Action } })
 
+// Phase 3 — chrome.offscreen, chrome.runtime.getContexts, and chrome.runtime.ContextType shims
+// Required so unit tests calling chrome.offscreen.* or chrome.runtime.getContexts() don't throw
+;(global as any).chrome.offscreen = {
+  createDocument: vi.fn().mockResolvedValue(undefined),
+  closeDocument: vi.fn().mockResolvedValue(undefined),
+  Reason: {
+    WORKERS: 'WORKERS',
+    BLOBS: 'BLOBS',
+  },
+}
+;(global as any).chrome.runtime.getContexts = vi.fn().mockResolvedValue([])
+;(global as any).chrome.runtime.ContextType = {
+  OFFSCREEN_DOCUMENT: 'OFFSCREEN_DOCUMENT',
+}
+// Guarded chrome.runtime.getURL shim — only set if not already a function
+if (typeof (global as any).chrome.runtime.getURL !== 'function') {
+  ;(global as any).chrome.runtime.getURL = (path: string) => `chrome-extension://test/${path}`
+}
+
 // ResizeObserver is not implemented in jsdom — required by Recharts ResponsiveContainer
 // Polyfill with a no-op stub so dashboard App.test.tsx can render without throwing
 class ResizeObserverStub {
