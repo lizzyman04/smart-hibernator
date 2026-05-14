@@ -98,18 +98,9 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 })
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  // Only capture when page has finished loading AND the tab is currently active
-  // captureVisibleTab is hard-constrained to the active tab — RESEARCH.md Pitfall 2
-  if (changeInfo.status !== 'complete') return
-  if (!tab.active) return
-  if (!tab.url?.startsWith('http')) return
-  captureAndStore(tabId, tab.url, tab.windowId).catch((err) =>
-    console.error('[smart-hibernator] thumbnail capture failed', err)
-  )
-
-  // Phase 3 (D-09 implicit wake signal): if a tab was discarded and is now woken,
-  // record a misclassification signal for its domain if the wake is within the short window
-  // and it was previously classified.
+  // Phase 3 (D-09 implicit wake signal): fires on the event where discarded transitions
+  // to false. Chrome emits discarded:false on the 'loading' event, NOT on 'complete' —
+  // so this check must come BEFORE the status==='complete' early-return guard (CR-02).
   if (changeInfo.discarded === false && tab.url) {
     chrome.storage.local.get('ai_classifications', (r) => {
       const cache = (r['ai_classifications'] as Record<number, ClassificationResult>) ?? {}
@@ -128,6 +119,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       }
     })
   }
+
+  // Only capture when page has finished loading AND the tab is currently active
+  // captureVisibleTab is hard-constrained to the active tab — RESEARCH.md Pitfall 2
+  if (changeInfo.status !== 'complete') return
+  if (!tab.active) return
+  if (!tab.url?.startsWith('http')) return
+  captureAndStore(tabId, tab.url, tab.windowId).catch((err) =>
+    console.error('[smart-hibernator] thumbnail capture failed', err)
+  )
 })
 
 chrome.tabs.onRemoved.addListener((tabId) => {
