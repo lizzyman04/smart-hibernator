@@ -56,14 +56,19 @@ Plans:
 - [x] 03-04-PLAN.md — Wave 4: Popup V/S/D pill + Keep Alive button + Dashboard AI summary
 
 ### Phase 4: Perfect State Restoration
-**Goal**: Ensure that waking a tab feels like it was never gone by restoring all session state.
+**Goal**: Ensure that waking a tab feels like it was never gone by restoring scroll position and form input state across the native discard/reload cycle, within 600ms.
 **Depends on**: Phase 1
 **Requirements**: FR-11, FR-12
 **Success Criteria** (what must be TRUE):
   1. Waking a tab restores the exact scroll position it had before hibernation.
   2. Form input data is persisted and re-injected upon tab restoration.
   3. The transition from "Discarded" to "Active" completes in less than 600ms.
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Wave 1: Foundation (types, constants, IDB v3 tab-state store + CRUD, test scaffolds)
+- [ ] 04-02-PLAN.md — Wave 2: SW handlers (SAVE_STATE persist, GET_STATE URL-match + delete-after-restore, onRemoved eviction)
+- [ ] 04-03-PLAN.md — Wave 3: Content script (debounced capture + D-03 exclusions, GET_STATE restore, D-04 matching, bounded MutationObserver, FR-12 cap)
 **UI hint**: yes
 
 ### Phase 5: Polishing & Launch
@@ -84,5 +89,5 @@ Plans:
 | 1. Core Hibernation Engine | 4/4 | Complete | 01-01, 01-02, 01-03, 01-04 done (2026-04-30) |
 | 2. UI & Rich Previews | 4/4 | Complete | 02-01, 02-02, 02-03, 02-04 done (2026-05-03) |
 | 3. AI Intelligence | 4/4 | Complete   | 2026-05-14 |
-| 4. Perfect State Restoration | 0/1 | Not started | - |
+| 4. Perfect State Restoration | 0/3 | Not started | - |
 | 5. Polishing & Launch | 0/1 | Not started | - |
