@@ -9,7 +9,11 @@
   },
   "workflow": {
     "auto_mode": true,
-    "gsd_version": "1.0"
+    "gsd_version": "1.0",
+    "_auto_chain_active": false
   },
-  "targets": ["Chrome", "Edge"]
+  "targets": [
+    "Chrome",
+    "Edge"
+  ]
 }
