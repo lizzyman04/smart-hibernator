@@ -3,7 +3,7 @@
 // Phase 3: bumped to DB version 2; adds tab-history and domain-bias stores
 import { openDB, type IDBPDatabase } from 'idb'
 import { IDB_SIZE_CAP_BYTES } from '../shared/constants'
-import type { TabHistoryRecord, DomainBiasRecord } from '../shared/types'
+import type { TabHistoryRecord, DomainBiasRecord, TabStateSnapshot } from '../shared/types'
 
 export interface ThumbnailRecord {
   tabId: number
@@ -26,13 +26,17 @@ interface SmartHibernatorDB {
     key: string        // domain string (primary key)
     value: DomainBiasRecord
   }
+  'tab-state': {
+    key: number        // tabId (keyPath)
+    value: TabStateSnapshot
+  }
 }
 
 let dbPromise: Promise<IDBPDatabase<SmartHibernatorDB>> | null = null
 
 function getDb(): Promise<IDBPDatabase<SmartHibernatorDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<SmartHibernatorDB>('smart-hibernator', 2, {
+    dbPromise = openDB<SmartHibernatorDB>('smart-hibernator', 3, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           if (!db.objectStoreNames.contains('thumbnails')) {
@@ -44,6 +48,9 @@ function getDb(): Promise<IDBPDatabase<SmartHibernatorDB>> {
           histStore.createIndex('by-domain', 'domain')
           histStore.createIndex('by-timestamp', 'timestamp')
           db.createObjectStore('domain-bias', { keyPath: 'domain' })
+        }
+        if (oldVersion < 3) {
+          db.createObjectStore('tab-state', { keyPath: 'tabId' })
         }
       },
       blocked() {
@@ -164,4 +171,30 @@ export async function getDomainBias(domain: string): Promise<DomainBiasRecord | 
 export async function putDomainBias(record: DomainBiasRecord): Promise<void> {
   const db = await getDb()
   await db.put('domain-bias', record)
+}
+
+// ─── tab-state store (Phase 4 — FR-11) ───────────────────────────────────────
+
+/**
+ * Upsert a tab state snapshot keyed by tabId.
+ */
+export async function putTabState(record: TabStateSnapshot): Promise<void> {
+  const db = await getDb()
+  await db.put('tab-state', record)
+}
+
+/**
+ * Retrieve a tab state snapshot by tabId, or undefined if not found.
+ */
+export async function getTabState(tabId: number): Promise<TabStateSnapshot | undefined> {
+  const db = await getDb()
+  return db.get('tab-state', tabId)
+}
+
+/**
+ * Delete a tab state snapshot by tabId (D-06: delete-after-restore + onRemoved eviction).
+ */
+export async function deleteTabState(tabId: number): Promise<void> {
+  const db = await getDb()
+  await db.delete('tab-state', tabId)
 }
