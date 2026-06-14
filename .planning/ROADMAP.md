@@ -5,7 +5,7 @@
 - [x] **Phase 1: Core Hibernation Engine** - Establish MV3 foundation and reliable heuristic-based tab discarding.
 - [x] **Phase 2: UI & Rich Previews** - Visual feedback, thumbnails, and central savings dashboard.
 - [x] **Phase 3: AI Intelligence** - Local ONNX-based tab vitality classification and dynamic timeouts. (completed 2026-05-14)
-- [ ] **Phase 4: Perfect State Restoration** - Seamless wake-up with preserved scroll and form state.
+- [x] **Phase 4: Perfect State Restoration** - Seamless wake-up with preserved scroll and form state. (completed 2026-06-14)
 - [ ] **Phase 5: Polishing & Launch** - Performance optimization, edge-case hardening, and CWS preparation.
 
 ## Phase Details
@@ -68,7 +68,7 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — Wave 1: Foundation (types, constants, IDB v3 tab-state store + CRUD, test scaffolds)
 - [x] 04-02-PLAN.md — Wave 2: SW handlers (SAVE_STATE persist, GET_STATE URL-match + delete-after-restore, onRemoved eviction)
-- [ ] 04-03-PLAN.md — Wave 3: Content script (debounced capture + D-03 exclusions, GET_STATE restore, D-04 matching, bounded MutationObserver, FR-12 cap)
+- [x] 04-03-PLAN.md — Wave 3: Content script (debounced capture + D-03 exclusions, GET_STATE restore, D-04 matching, bounded MutationObserver, FR-12 cap)
 **UI hint**: yes
 
 ### Phase 5: Polishing & Launch
@@ -89,5 +89,5 @@ Plans:
 | 1. Core Hibernation Engine | 4/4 | Complete | 01-01, 01-02, 01-03, 01-04 done (2026-04-30) |
 | 2. UI & Rich Previews | 4/4 | Complete | 02-01, 02-02, 02-03, 02-04 done (2026-05-03) |
 | 3. AI Intelligence | 4/4 | Complete   | 2026-05-14 |
-| 4. Perfect State Restoration | 2/3 | In Progress|  |
+| 4. Perfect State Restoration | 3/3 | Complete   | 2026-06-14 |
 | 5. Polishing & Launch | 0/1 | Not started | - |

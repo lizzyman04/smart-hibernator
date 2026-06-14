@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 04 executing
-last_updated: "2026-06-14T09:30:27.941Z"
+status: Phase 04 complete — ready for verification
+last_updated: "2026-06-14T11:40:00.000Z"
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
-  completed_plans: 14
-  percent: 93
+  completed_plans: 15
+  percent: 100
 ---
 
 # Project State - Smart Hibernator
@@ -22,12 +22,12 @@ progress:
 
 ## Current Position
 
-Phase: 04 (perfect-state-restoration) — EXECUTING
-Plan: 3 of 3
+Phase: 04 (perfect-state-restoration) — COMPLETE
+Plan: 3 of 3 (ALL DONE)
 **Phase**: 4 (Perfect State Restoration)
-**Plan**: 04-01 COMPLETE (1/3 Phase 4 plans done)
-**Status**: EXECUTING
-**Progress**: [██████████] 100% Phase 1 + [██████████] 100% Phase 2 + [██████████] 100% Phase 3 + [███░░░░░░░] 33% Phase 4
+**Plan**: 04-03 COMPLETE (3/3 Phase 4 plans done)
+**Status**: READY FOR VERIFICATION
+**Progress**: [██████████] 100% Phase 1 + [██████████] 100% Phase 2 + [██████████] 100% Phase 3 + [██████████] 100% Phase 4
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Plan: 3 of 3
 - **03-04 Duration**: 360s | Tasks: 2/2 | Files: 0 created, 4 modified
 - **04-01 Duration**: 300s | Tasks: 3/3 | Files: 2 created, 3 modified
 - **04-02 Duration**: 240s | Tasks: 2/2 | Files: 0 created, 2 modified
+- **04-03 Duration**: 480s | Tasks: 2/2 | Files: 0 created, 2 modified
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Plan: 3 of 3
 - **Phase 4 Wave 0 — form-watcher.test.ts fake timers**: vi.useFakeTimers must opt in performance.now() explicitly via toFake array (vitest issue #9352); it.todo() used for placeholders so downstream plan fills in tests cleanly.
 - **Phase 4 Wave 1 — GET_STATE async handler**: uses .then()/.catch() chain (not async/await) so the enclosing onMessage listener can return true as a literal boolean for Chrome 120 compat (COMP-01); async handler auto-returns a Promise which Chrome 120 ignores.
 - **Phase 4 Wave 1 — SAVE_STATE/GET_STATE tabId source**: always from sender.tab.id (MessageSender), never from message body — T-04-04 spoofing defense; content scripts cannot claim another tab's id.
+- **Phase 4 Wave 2 — CSS.escape JSDOM guard**: typeof CSS !== 'undefined' && CSS.escape guard needed in content-script resolveField because JSDOM does not expose the CSS global; fallback to manual quote escaping.
+- **Phase 4 Wave 2 — Content script no-import convention**: All constants and structural types inlined in form-watcher.ts (identical values to shared/constants.ts and shared/types.ts) — build does not bundle shared module imports into the content script the same way.
+- **Phase 4 Wave 2 — GET_STATE callback overload**: sendMessage(msg, callback) not Promise form in content script — Chrome 120 COMP-01; async handler would return Promise, unsupported on Chrome < 148.
 
 ### Todos
 
@@ -112,6 +116,6 @@ Plan: 3 of 3
 
 ## Session Continuity
 
-**Last Session**: 2026-06-14 — Plan 04-02 (SW handlers) executed. SAVE_STATE + GET_STATE message handlers and onRemoved deleteTabState eviction added to index.ts. index.test.ts extended with 6 new tests (tab-state messaging + onRemoved eviction). TDD: RED commit f4256f9, GREEN commit e80fe13. npm test -- src/background/index.test.ts: 14/14 passing.
-**Next Session**: Phase 4 plan 04-03 — content script capture and restore (form-watcher.ts)
+**Last Session**: 2026-06-14 — Plan 04-03 (content script capture+restore) executed. form-watcher.ts extended from 23 to 260+ lines: debounced capture, D-03 exclusions, flush handlers, GET_STATE restore, bounded MutationObserver (FR-12). form-watcher.test.ts filled (27 tests, 0 todos). TDD: RED commit afd8e81, GREEN commit 9164b3e. npm test -- src/content/form-watcher.test.ts: 27/27 passing. Phase 4 complete.
+**Next Session**: Phase 5 or /gsd-verify-work for Phase 4 gate
 **Resume file**: None
