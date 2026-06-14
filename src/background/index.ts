@@ -6,10 +6,10 @@ import { createContextMenus } from './contextMenus'
 import { ensureHibernateAlarm } from './alarms'
 import { ALARM_NAME, AI_CONFIDENCE_THRESHOLD, AI_WAKE_SIGNAL_WINDOW_MS } from '../shared/constants'
 import { captureAndStore } from './thumbnail'
-import { deleteThumbnail } from './idb'
+import { deleteThumbnail, putTabState, getTabState, deleteTabState } from './idb'
 import { ensureOffscreen } from './classifier'
 import { recordKeepAlive, recordTabActivation, closeTabVisit, recordWakeMisclassification } from './ai-learning'
-import type { ClassificationResult } from '../shared/types'
+import type { ClassificationResult, TabStateSnapshot, FieldSnapshot } from '../shared/types'
 
 // IMPORTANT: Call ensureHibernateAlarm() at module top level so it runs on
 // EVERY SW restart, not just on install events. This prevents hibernation from
@@ -137,6 +137,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     chrome.storage.local.set({ tab_meta })
   })
   deleteThumbnail(tabId).catch(() => { /* silently ignore — tab already gone */ })
+  deleteTabState(tabId).catch(() => {})   // Phase 4: D-06 eviction on tab close
 
   // Phase 3: Close the visit window for the removed tab (best-effort — hadFormActivity unknown)
   closeTabVisit(tabId, false).catch(() => {})
@@ -147,7 +148,43 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 })
 
-chrome.runtime.onMessage.addListener((message, sender) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Phase 4 (D-05, D-06, FR-11): SAVE_STATE — fire-and-forget IDB write.
+  // SW is sole IDB writer (Phase 3 invariant). tabId is from sender.tab.id only —
+  // never from the message body (T-04-04 spoofing mitigation).
+  if (message.type === 'SAVE_STATE' && sender.tab?.id) {
+    const tabId = sender.tab.id
+    const snapshot: TabStateSnapshot = {
+      tabId,
+      url: message.url as string,
+      scroll: message.scroll as { x: number; y: number },
+      fields: message.fields as FieldSnapshot[],
+      capturedAt: Date.now(),
+    }
+    putTabState(snapshot).catch(() => {})
+    return   // fire-and-forget; no sendResponse needed
+  }
+
+  // Phase 4 (D-06, D-08, FR-11): GET_STATE — async URL-match + delete-after-restore.
+  // CRITICAL: return true (literal) to keep the message channel open for the async
+  // sendResponse. Do NOT make this handler async (Chrome 120 compat — COMP-01).
+  // T-04-04: guard on sender.tab?.id — only real content-script tabs are served.
+  // T-04-05: snapshot.url !== url guard prevents stale state injection on tabId reuse.
+  // T-04-07: sendResponse always called on both resolve and catch — channel never leaks.
+  if (message.type === 'GET_STATE' && sender.tab?.id) {
+    const tabId = sender.tab.id
+    const url = message.url as string
+    getTabState(tabId).then((snapshot) => {
+      if (!snapshot || snapshot.url !== url) {
+        sendResponse(null)
+        return
+      }
+      deleteTabState(tabId).catch(() => {})   // D-06 delete-after-restore
+      sendResponse(snapshot)
+    }).catch(() => sendResponse(null))
+    return true   // CRITICAL: keeps message channel open for async sendResponse
+  }
+
   if (message.type === 'FORM_ACTIVITY' && sender.tab?.id) {
     const tabId = sender.tab.id
     chrome.storage.local.get('tab_meta', (result) => {
