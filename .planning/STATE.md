@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 04 executing
-last_updated: "2026-06-14T11:22:00.000Z"
+last_updated: "2026-06-14T09:30:27.941Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 15
-  completed_plans: 13
-  percent: 87
+  completed_plans: 14
+  percent: 93
 ---
 
 # Project State - Smart Hibernator
@@ -23,7 +23,7 @@ progress:
 ## Current Position
 
 Phase: 04 (perfect-state-restoration) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 **Phase**: 4 (Perfect State Restoration)
 **Plan**: 04-01 COMPLETE (1/3 Phase 4 plans done)
 **Status**: EXECUTING
@@ -46,6 +46,7 @@ Plan: 2 of 3
 - **03-03 Duration**: 420s | Tasks: 3/3 | Files: 1 created, 4 modified
 - **03-04 Duration**: 360s | Tasks: 2/2 | Files: 0 created, 4 modified
 - **04-01 Duration**: 300s | Tasks: 3/3 | Files: 2 created, 3 modified
+- **04-02 Duration**: 240s | Tasks: 2/2 | Files: 0 created, 2 modified
 
 ## Accumulated Context
 
@@ -97,6 +98,8 @@ Plan: 2 of 3
 - **Phase 3 Wave 3 — makeStorageMock test helper**: returns all storage keys regardless of single vs array key argument — avoids brittle per-call mock branching in popup and dashboard tests.
 - **Phase 4 Wave 0 — IDB tab-state store**: v2->v3 additive upgrade; tab-state keyed by tabId; no prune logic needed (delete-after-restore + onRemoved eviction in 04-02 bound cardinality per D-06).
 - **Phase 4 Wave 0 — form-watcher.test.ts fake timers**: vi.useFakeTimers must opt in performance.now() explicitly via toFake array (vitest issue #9352); it.todo() used for placeholders so downstream plan fills in tests cleanly.
+- **Phase 4 Wave 1 — GET_STATE async handler**: uses .then()/.catch() chain (not async/await) so the enclosing onMessage listener can return true as a literal boolean for Chrome 120 compat (COMP-01); async handler auto-returns a Promise which Chrome 120 ignores.
+- **Phase 4 Wave 1 — SAVE_STATE/GET_STATE tabId source**: always from sender.tab.id (MessageSender), never from message body — T-04-04 spoofing defense; content scripts cannot claim another tab's id.
 
 ### Todos
 
@@ -109,6 +112,6 @@ Plan: 2 of 3
 
 ## Session Continuity
 
-**Last Session**: 2026-06-14 — Plan 04-01 (Wave 0 data foundation) executed. FieldSnapshot+TabStateSnapshot types added to shared/types.ts. Four Phase 4 constants added to constants.ts. IDB bumped to v3 with tab-state store and putTabState/getTabState/deleteTabState CRUD helpers. idb.test.ts extended with tab-state CRUD block (4 tests). form-watcher.test.ts created with FR-12 fake-timer scaffold and 4 todo describe blocks. npm test: 2 files, 18 passing, 4 todo, 0 failures.
-**Next Session**: Phase 4 plan 04-02 — SW handlers (SAVE_STATE, GET_STATE, onRemoved eviction)
+**Last Session**: 2026-06-14 — Plan 04-02 (SW handlers) executed. SAVE_STATE + GET_STATE message handlers and onRemoved deleteTabState eviction added to index.ts. index.test.ts extended with 6 new tests (tab-state messaging + onRemoved eviction). TDD: RED commit f4256f9, GREEN commit e80fe13. npm test -- src/background/index.test.ts: 14/14 passing.
+**Next Session**: Phase 4 plan 04-03 — content script capture and restore (form-watcher.ts)
 **Resume file**: None

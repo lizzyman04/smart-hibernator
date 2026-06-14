@@ -67,7 +67,7 @@ Plans:
 
 Plans:
 - [x] 04-01-PLAN.md — Wave 1: Foundation (types, constants, IDB v3 tab-state store + CRUD, test scaffolds)
-- [ ] 04-02-PLAN.md — Wave 2: SW handlers (SAVE_STATE persist, GET_STATE URL-match + delete-after-restore, onRemoved eviction)
+- [x] 04-02-PLAN.md — Wave 2: SW handlers (SAVE_STATE persist, GET_STATE URL-match + delete-after-restore, onRemoved eviction)
 - [ ] 04-03-PLAN.md — Wave 3: Content script (debounced capture + D-03 exclusions, GET_STATE restore, D-04 matching, bounded MutationObserver, FR-12 cap)
 **UI hint**: yes
 
@@ -89,5 +89,5 @@ Plans:
 | 1. Core Hibernation Engine | 4/4 | Complete | 01-01, 01-02, 01-03, 01-04 done (2026-04-30) |
 | 2. UI & Rich Previews | 4/4 | Complete | 02-01, 02-02, 02-03, 02-04 done (2026-05-03) |
 | 3. AI Intelligence | 4/4 | Complete   | 2026-05-14 |
-| 4. Perfect State Restoration | 1/3 | In Progress|  |
+| 4. Perfect State Restoration | 2/3 | In Progress|  |
 | 5. Polishing & Launch | 0/1 | Not started | - |
