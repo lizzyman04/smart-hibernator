@@ -1,5 +1,6 @@
 // Covers FR-08 IDB CRUD + eviction contract (Phase 2 thumbnails)
 // Covers FR-06 IDB CRUD contract (Phase 3 tab-history + domain-bias stores)
+// Covers FR-11 IDB CRUD contract (Phase 4 tab-state store)
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   putThumbnail,
@@ -13,9 +14,12 @@ import {
   pruneTabHistory,
   getDomainBias,
   putDomainBias,
+  putTabState,
+  getTabState,
+  deleteTabState,
 } from './idb'
 import type { ThumbnailRecord } from './idb'
-import type { TabHistoryRecord, DomainBiasRecord } from '../shared/types'
+import type { TabHistoryRecord, DomainBiasRecord, TabStateSnapshot } from '../shared/types'
 import { IDB_SIZE_CAP_BYTES } from '../shared/constants'
 
 // fake-indexeddb/auto is imported in vitest.setup.ts — global indexedDB is available
@@ -170,5 +174,58 @@ describe('domain-bias CRUD (FR-06)', () => {
     await putDomainBias(makeBiasRecord({ domain: 'overwrite.com', biasOffset: 0.9 }))
     const result = await getDomainBias('overwrite.com')
     expect(result!.biasOffset).toBe(0.9)
+  })
+})
+
+function makeStateSnapshot(overrides: Partial<TabStateSnapshot> = {}): TabStateSnapshot {
+  return {
+    tabId: 1,
+    url: 'https://example.com',
+    scroll: { x: 0, y: 100 },
+    fields: [],
+    capturedAt: Date.now(),
+    ...overrides,
+  }
+}
+
+describe('tab-state CRUD (FR-11)', () => {
+  it('putTabState stores a record retrievable by getTabState with matching url/scroll/fields', async () => {
+    const snapshot = makeStateSnapshot({ tabId: 500, url: 'https://state-test.com', scroll: { x: 10, y: 200 } })
+    await putTabState(snapshot)
+    const result = await getTabState(500)
+    expect(result).toBeDefined()
+    expect(result!.url).toBe('https://state-test.com')
+    expect(result!.scroll).toEqual({ x: 10, y: 200 })
+    expect(result!.fields).toEqual([])
+  })
+
+  it('getTabState returns undefined for an unknown tabId', async () => {
+    const result = await getTabState(99999)
+    expect(result).toBeUndefined()
+  })
+
+  it('deleteTabState removes the entry; subsequent getTabState returns undefined', async () => {
+    const snapshot = makeStateSnapshot({ tabId: 501 })
+    await putTabState(snapshot)
+    await deleteTabState(501)
+    expect(await getTabState(501)).toBeUndefined()
+  })
+
+  it('a record with populated fields[] round-trips intact', async () => {
+    const snapshot = makeStateSnapshot({
+      tabId: 502,
+      fields: [
+        { id: 'email', name: 'email', value: 'user@example.com', type: 'input[text]' },
+        { name: 'comment', value: 'hello world', type: 'textarea' },
+      ],
+    })
+    await putTabState(snapshot)
+    const result = await getTabState(502)
+    expect(result).toBeDefined()
+    expect(result!.fields).toHaveLength(2)
+    expect(result!.fields[0].id).toBe('email')
+    expect(result!.fields[0].value).toBe('user@example.com')
+    expect(result!.fields[1].name).toBe('comment')
+    expect(result!.fields[1].value).toBe('hello world')
   })
 })
