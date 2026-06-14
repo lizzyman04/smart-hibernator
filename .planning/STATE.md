@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 03 complete
-last_updated: "2026-06-02T05:34:04.539Z"
+status: Phase 04 executing
+last_updated: "2026-06-14T11:22:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 15
-  completed_plans: 12
-  percent: 80
+  completed_plans: 13
+  percent: 87
 ---
 
 # Project State - Smart Hibernator
@@ -22,12 +22,12 @@ progress:
 
 ## Current Position
 
-Phase: 03 — COMPLETE
-Plan: 4 of 4
-**Phase**: 3 (AI Intelligence)
-**Plan**: 03-04 COMPLETE (4/4 Phase 3 plans done)
-**Status**: READY_FOR_VERIFICATION
-**Progress**: [██████████] 100% Phase 1 + [██████████] 100% Phase 2 + [██████████] 100% Phase 3
+Phase: 04 (perfect-state-restoration) — EXECUTING
+Plan: 2 of 3
+**Phase**: 4 (Perfect State Restoration)
+**Plan**: 04-01 COMPLETE (1/3 Phase 4 plans done)
+**Status**: EXECUTING
+**Progress**: [██████████] 100% Phase 1 + [██████████] 100% Phase 2 + [██████████] 100% Phase 3 + [███░░░░░░░] 33% Phase 4
 
 ## Performance Metrics
 
@@ -45,6 +45,7 @@ Plan: 4 of 4
 - **03-02 Duration**: 1500s | Tasks: 3/3 | Files: 2 created, 5 modified
 - **03-03 Duration**: 420s | Tasks: 3/3 | Files: 1 created, 4 modified
 - **03-04 Duration**: 360s | Tasks: 2/2 | Files: 0 created, 4 modified
+- **04-01 Duration**: 300s | Tasks: 3/3 | Files: 2 created, 3 modified
 
 ## Accumulated Context
 
@@ -94,6 +95,8 @@ Plan: 4 of 4
 - **Phase 3 Wave 2 — recordWakeMisclassification cold-start behavior**: No existing bias record → always writes initial signal (no window check on cold start). Cold-start wake starts the bias trail per D-09.
 - **Phase 3 Wave 3 — loadHibernatedTabs independent storage read**: reads ai_classifications via separate storage.get call inside the function — decouples from current-tab callback to prevent test failures when active-tab query returns empty.
 - **Phase 3 Wave 3 — makeStorageMock test helper**: returns all storage keys regardless of single vs array key argument — avoids brittle per-call mock branching in popup and dashboard tests.
+- **Phase 4 Wave 0 — IDB tab-state store**: v2->v3 additive upgrade; tab-state keyed by tabId; no prune logic needed (delete-after-restore + onRemoved eviction in 04-02 bound cardinality per D-06).
+- **Phase 4 Wave 0 — form-watcher.test.ts fake timers**: vi.useFakeTimers must opt in performance.now() explicitly via toFake array (vitest issue #9352); it.todo() used for placeholders so downstream plan fills in tests cleanly.
 
 ### Todos
 
@@ -106,6 +109,6 @@ Plan: 4 of 4
 
 ## Session Continuity
 
-**Last Session**: 2026-05-14 — Plan 03-04 (Wave 3 UI) executed. popup/App.tsx extended with V/S/D pill badges, Keep Alive button, ai_classifications storage subscription. dashboard/App.tsx extended with AI Classification card in Stats tab (V/S/D counts + learning countdown). npm test: 9 files, 113 passing, 0 todo, 0 failures.
-**Next Session**: Phase 3 complete — ready for verification via /gsd-verify-work
-**Resume file**: None — Phase 3 execution complete
+**Last Session**: 2026-06-14 — Plan 04-01 (Wave 0 data foundation) executed. FieldSnapshot+TabStateSnapshot types added to shared/types.ts. Four Phase 4 constants added to constants.ts. IDB bumped to v3 with tab-state store and putTabState/getTabState/deleteTabState CRUD helpers. idb.test.ts extended with tab-state CRUD block (4 tests). form-watcher.test.ts created with FR-12 fake-timer scaffold and 4 todo describe blocks. npm test: 2 files, 18 passing, 4 todo, 0 failures.
+**Next Session**: Phase 4 plan 04-02 — SW handlers (SAVE_STATE, GET_STATE, onRemoved eviction)
+**Resume file**: None
