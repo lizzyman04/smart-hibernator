@@ -38,3 +38,17 @@ export const VITAL_DOMAINS: readonly string[] = [
 
 /** Preset dead domains — empty by default; user-driven via Keep Alive negative space (D-02) */
 export const DEAD_DOMAINS: readonly string[] = []
+
+// Phase 4 — State Restoration constants
+
+/** D-01: scroll/input debounce interval before sending SAVE_STATE to SW */
+export const DEBOUNCE_MS = 500
+
+/** D-07: MutationObserver cap for restore loop (50ms under FR-12 600ms budget) */
+export const RESTORE_CAP_MS = 550
+
+/** Pitfall 6: field count cap per snapshot — limits snapshot memory footprint */
+export const MAX_FIELDS = 50
+
+/** Pitfall 6: per-field value length cap in characters */
+export const MAX_FIELD_VALUE_LEN = 10_000

@@ -38,6 +38,24 @@ export interface DomainBiasRecord {
   updatedAt: number
 }
 
+// Phase 4 — State Restoration (FR-11)
+
+export interface FieldSnapshot {
+  id?: string              // element.id if present
+  name?: string            // element.name if present
+  selectorPath?: string    // nth-child CSS path fallback (D-04)
+  value: string            // serialized value (checkbox: 'true'/'false')
+  type: string             // e.g. 'input[text]', 'textarea', 'select'
+}
+
+export interface TabStateSnapshot {
+  tabId: number            // IDB key (keyPath)
+  url: string              // D-06: URL match guard
+  scroll: { x: number; y: number }
+  fields: FieldSnapshot[]
+  capturedAt: number
+}
+
 export interface StorageSchema {
   hibernation_enabled: boolean
   hibernated_count: number
