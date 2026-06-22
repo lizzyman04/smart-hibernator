@@ -161,13 +161,20 @@ export async function ensureOffscreen(): Promise<void> {
   }
 
   // First caller: create the document
-  creatingOffscreen = chrome.offscreen.createDocument({
+  const creation = chrome.offscreen.createDocument({
     url: 'src/offscreen/index.html',
     reasons: [chrome.offscreen.Reason.WORKERS],
     justification: 'Run ONNX Runtime Web for local tab vitality classification',
   })
-  await creatingOffscreen
-  creatingOffscreen = null
+  creatingOffscreen = creation
+  try {
+    await creation
+  } finally {
+    // Always clear — a failed attempt must not poison subsequent calls (CR-01).
+    // A rejected promise left cached here would wedge every later ensureOffscreen()
+    // for the rest of the SW lifetime, silently killing the classifier.
+    if (creatingOffscreen === creation) creatingOffscreen = null
+  }
 }
 
 // ─── Batch classification + storage cache (RESEARCH Pattern 6 / T-03-06) ───
@@ -203,16 +210,23 @@ export async function classifyBatch(
     // D-05: increment pending BEFORE sendMessage so teardownIfIdle cannot fire mid-inference.
     // pending-- runs in finally so it decrements even when sendMessage throws (T-05-01).
     pending++
-    let response: { results: Array<{ tabId: number; label: TabVitality | null; confidence: number }> }
+    let response: { results?: Array<{ tabId: number; label: TabVitality | null; confidence: number }> } | undefined
     try {
       response = (await chrome.runtime.sendMessage({
         type: 'CLASSIFY_BATCH',
         tabs: toClassify,
-      })) as { results: Array<{ tabId: number; label: TabVitality | null; confidence: number }> }
+      })) as { results?: Array<{ tabId: number; label: TabVitality | null; confidence: number }> } | undefined
     } finally {
       pending--
       armIdleTeardown() // D-01: re-arm idle timer after each burst; resets the window
     }
+
+    // WR-01: validate the response shape before iterating. sendMessage can resolve to
+    // undefined (no listener, channel closed, doc torn down mid-flight), in which case
+    // response.results would throw. Treat a missing/malformed result as an empty batch
+    // and skip rather than silently masking the wiring failure with a TypeError.
+    const results = Array.isArray(response?.results) ? response.results : []
+    if (results.length === 0) return
 
     // Read existing classification cache
     const current = await chrome.storage.local.get('ai_classifications')
@@ -230,7 +244,7 @@ export async function classifyBatch(
 
     // Write new classification results into cache
     const now = Date.now()
-    for (const r of response.results) {
+    for (const r of results) {
       cache[r.tabId] = { label: r.label, confidence: r.confidence, cachedAt: now }
     }
 
