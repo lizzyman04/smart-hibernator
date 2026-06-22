@@ -107,8 +107,14 @@ export function shouldCapture(
 }
 
 /**
- * Builds a CSS nth-child selector path from el to document.body.
+ * Builds a CSS selector path from el to document.body.
  * Used only when element has neither id nor name (D-04 fallback).
+ *
+ * WR-04: uses :nth-of-type (count among same-tag siblings) rather than :nth-child
+ * (count among ALL sibling element types). :nth-of-type is more stable when a parent
+ * mixes element types, reducing — though not eliminating — the chance of a non-unique
+ * path. resolveField additionally rejects ambiguous paths (more than one match) to
+ * prevent a wrong-field write when two structurally similar subtrees still collide.
  */
 export function getCssSelectorPath(el: Element): string {
   const path: string[] = []
@@ -116,8 +122,12 @@ export function getCssSelectorPath(el: Element): string {
   while (node && node !== document.body) {
     const parent = node.parentElement
     if (!parent) break
-    const index = Array.from(parent.children).indexOf(node) + 1
-    path.unshift(`${node.tagName.toLowerCase()}:nth-child(${index})`)
+    const tag = node.tagName.toLowerCase()
+    const sameTagSiblings = Array.from(parent.children).filter(
+      (c) => c.tagName.toLowerCase() === tag,
+    )
+    const index = sameTagSiblings.indexOf(node) + 1
+    path.unshift(`${tag}:nth-of-type(${index})`)
     node = parent
   }
   return path.join(' > ')
@@ -218,7 +228,15 @@ export function resolveField(field: LocalFieldSnapshot): Element | null {
       : field.name.replace(/"/g, '\\"')
     return document.querySelector(`[name="${escapedName}"]`)
   }
-  if (field.selectorPath) return document.querySelector(field.selectorPath)
+  if (field.selectorPath) {
+    // WR-04: a generated selectorPath can be non-unique (repeated form rows /
+    // component-based pages). querySelector would return the FIRST match, which may
+    // be a different field than the one captured — silently writing the saved value
+    // into the wrong field. Only resolve when exactly one element matches; an ambiguous
+    // path is skipped (treated as unresolvable) rather than risking a wrong-field write.
+    const matches = document.querySelectorAll(field.selectorPath)
+    return matches.length === 1 ? matches[0] : null
+  }
   return null
 }
 
