@@ -203,6 +203,116 @@ describe('NFR-04: no fetch() call escapes to a non chrome-extension:// origin', 
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// D-01: RELEASE_SESSION handler
+// Uses vi.doMock() + vi.resetModules() + dynamic import() for fresh module with
+// a fresh session singleton per test (required to control the session object).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('D-01: RELEASE_SESSION handler', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.resetModules()
+  })
+
+  /**
+   * Build a fresh module with a controllable releaseMock on the session object.
+   */
+  async function loadFreshModule(releaseMock: ReturnType<typeof vi.fn> = vi.fn().mockResolvedValue(undefined)) {
+    vi.resetModules()
+
+    const localCreate = vi.fn().mockResolvedValue({
+      run: vi.fn().mockResolvedValue({
+        output_probability: { data: new Float32Array([0.1, 0.2, 0.7]), dims: [1, 3] },
+      }),
+      release: releaseMock,
+    })
+
+    vi.doMock('onnxruntime-web/wasm', () => ({
+      default: {},
+      env: { wasm: { wasmPaths: '', numThreads: 0 } },
+      Tensor: class MockTensor {
+        data: Float32Array
+        dims: number[]
+        constructor(_type: string, data: Float32Array, dims: number[]) {
+          this.data = data; this.dims = dims
+        }
+      },
+      InferenceSession: { create: localCreate },
+    }))
+
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(new ArrayBuffer(8), { status: 200 }) as Response
+    )
+
+    const mod = await import('./main')
+    return { mod, localCreate, releaseMock }
+  }
+
+  async function dispatchFresh(message: Record<string, unknown>): Promise<unknown> {
+    return new Promise((resolve) => {
+      ;(chrome.runtime.onMessage as any).callListeners(message, {}, (response: unknown) => {
+        resolve(response)
+      })
+    })
+  }
+
+  it('D-01: RELEASE_SESSION responds { ok: true }', async () => {
+    await loadFreshModule()
+    // First warm up the session so it is non-null
+    await dispatchFresh({ type: 'CLASSIFY_BATCH', tabs: [{ tabId: 1, features: [0, 0, 0, 0, 0, 0] }] })
+
+    const response = await dispatchFresh({ type: 'RELEASE_SESSION' })
+    expect(response).toEqual({ ok: true })
+  })
+
+  it('D-01: RELEASE_SESSION calls session.release() when session is non-null', async () => {
+    const releaseMock = vi.fn().mockResolvedValue(undefined)
+    await loadFreshModule(releaseMock)
+    // Warm up the session
+    await dispatchFresh({ type: 'CLASSIFY_BATCH', tabs: [{ tabId: 1, features: [0, 0, 0, 0, 0, 0] }] })
+    // Now release
+    await dispatchFresh({ type: 'RELEASE_SESSION' })
+    expect(releaseMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('D-01: RELEASE_SESSION is idempotent when session is already null', async () => {
+    await loadFreshModule()
+    // Do NOT warm up the session first — session remains null
+    const response = await dispatchFresh({ type: 'RELEASE_SESSION' })
+    expect(response).toEqual({ ok: true })
+  })
+
+  it('D-01: RELEASE_SESSION does not call release() when session is null', async () => {
+    const releaseMock = vi.fn().mockResolvedValue(undefined)
+    await loadFreshModule(releaseMock)
+    // Do NOT warm up — session is null
+    await dispatchFresh({ type: 'RELEASE_SESSION' })
+    expect(releaseMock).not.toHaveBeenCalled()
+  })
+
+  it('D-01: RELEASE_SESSION still responds { ok: true } even when session.release() rejects', async () => {
+    const releaseMock = vi.fn().mockRejectedValue(new Error('ORT dispose error'))
+    await loadFreshModule(releaseMock)
+    // Warm up the session
+    await dispatchFresh({ type: 'CLASSIFY_BATCH', tabs: [{ tabId: 1, features: [0, 0, 0, 0, 0, 0] }] })
+    // Release should not throw even if release() rejects
+    const response = await dispatchFresh({ type: 'RELEASE_SESSION' })
+    expect(response).toEqual({ ok: true })
+  })
+
+  it('D-01: only one onMessage.addListener call exists in main.ts (top-level listener invariant)', async () => {
+    // Read the source to verify — the test checks the structural invariant
+    const fs = await import('fs')
+    const source = fs.readFileSync(
+      new URL('./main.ts', import.meta.url).pathname,
+      'utf8'
+    )
+    const addListenerCount = (source.match(/onMessage\.addListener/g) ?? []).length
+    expect(addListenerCount).toBe(1)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // NFR-03: WebGPU / WASM backend selection
 // Uses vi.doMock() + vi.resetModules() + dynamic import() for fresh module graph.
 // ─────────────────────────────────────────────────────────────────────────────
