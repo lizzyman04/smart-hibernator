@@ -213,8 +213,13 @@ export async function putDomainBias(record: DomainBiasRecord): Promise<void> {
 
 /**
  * Upsert a tab state snapshot keyed by tabId.
- * Wrapped with quota guard (D-07) — tab-state is a size-bearing store;
- * uses pruneIfNeeded (thumbnail oldest-first eviction) as the fallback evictor.
+ * Wrapped with quota guard (D-07) using pruneIfNeeded as the fallback evictor.
+ *
+ * IN-02: pruneIfNeeded only evicts from the `thumbnails` store — thumbnail eviction
+ * is the ONLY lever here. If a QuotaExceededError is driven primarily by `tab-state`
+ * growth, freeing thumbnail space may not help and the retried tab-state write simply
+ * fails and is dropped silently (D-07). This is an accepted best-effort fallback, not
+ * a guarantee that tab-state writes survive under quota pressure.
  */
 export async function putTabState(record: TabStateSnapshot): Promise<void> {
   await putWithQuotaGuard(

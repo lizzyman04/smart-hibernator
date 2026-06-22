@@ -6,7 +6,10 @@
 // Inlined denylist (identical values to src/shared/restricted-urls.ts).
 // Content scripts are import-free — constants are duplicated here per project convention
 // (same pattern as DEBOUNCE_MS/MAX_FIELDS being inlined from shared/constants.ts).
-const INLINED_RESTRICTED_PREFIXES = [
+// IN-03: exported so a test can assert parity with shared/restricted-urls.ts
+// RESTRICTED_PREFIXES. The two lists are hand-kept copies (content scripts are
+// import-free by project convention); the parity test prevents silent desync.
+export const INLINED_RESTRICTED_PREFIXES = [
   'chrome://',
   'chrome-extension://',
   'edge://',

@@ -23,8 +23,15 @@
 export async function logMemoryProbe(tag: string): Promise<void> {
   if (!import.meta.env.DEV) return
 
-  const coi = (globalThis as any).crossOriginIsolated === true
-  const fn = (performance as any).measureUserAgentSpecificMemory
+  // IN-04: narrowed casts (instead of `as any`) so a typo in a property name still
+  // type-checks against the declared shape. These APIs are non-standard, so the
+  // properties remain optional and the runtime guards below are still required.
+  const coi = (globalThis as { crossOriginIsolated?: boolean }).crossOriginIsolated === true
+  const fn = (
+    performance as {
+      measureUserAgentSpecificMemory?: () => Promise<{ bytes: number; breakdown: unknown }>
+    }
+  ).measureUserAgentSpecificMemory
 
   if (!coi || typeof fn !== 'function') {
     console.debug(

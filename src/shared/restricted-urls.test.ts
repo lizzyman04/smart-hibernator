@@ -2,6 +2,7 @@
 // Covers: restricted-URL denylist, http/https passthrough, CWS host blocking
 import { describe, it, expect } from 'vitest'
 import { isInjectable, RESTRICTED_PREFIXES } from './restricted-urls'
+import { INLINED_RESTRICTED_PREFIXES } from '../content/form-watcher'
 
 describe('isInjectable — falsy/empty inputs', () => {
   it('returns false for undefined', () => {
@@ -87,5 +88,14 @@ describe('RESTRICTED_PREFIXES export', () => {
   it('contains CWS store hosts', () => {
     expect(RESTRICTED_PREFIXES).toContain('https://chromewebstore.google.com')
     expect(RESTRICTED_PREFIXES).toContain('https://chrome.google.com/webstore')
+  })
+})
+
+// IN-03: the content script inlines its own copy of the denylist (import-free
+// convention). Assert parity so a future edit to one list cannot silently desync
+// the SW-side guard from the content-script guard.
+describe('restricted-prefix parity (IN-03)', () => {
+  it('content-script INLINED_RESTRICTED_PREFIXES equals shared RESTRICTED_PREFIXES', () => {
+    expect(INLINED_RESTRICTED_PREFIXES).toEqual(RESTRICTED_PREFIXES)
   })
 })

@@ -228,6 +228,10 @@ export async function classifyBatch(
     const results = Array.isArray(response?.results) ? response.results : []
     if (results.length === 0) return
 
+    // IN-01: the cache read/prune/write below deliberately runs OUTSIDE the `pending`
+    // window (pending was already decremented in the finally above). This is correct:
+    // the `pending` guard only protects the offscreen inference round-trip; the cache
+    // write needs no offscreen doc, so it is safe for the idle timer to fire here.
     // Read existing classification cache
     const current = await chrome.storage.local.get('ai_classifications')
     const cache =
