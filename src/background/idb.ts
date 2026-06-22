@@ -69,11 +69,47 @@ function getDb(): Promise<IDBPDatabase<SmartHibernatorDB>> {
   return dbPromise
 }
 
+// ─── Quota-exceeded guard (D-07) ────────────────────────────────────────────
+// Wraps IDB write paths: catch QuotaExceededError → evict oldest → retry once → give up.
+// Reuses existing pruneIfNeeded() as the evict callback (oldest-first by capturedAt).
+// No new eviction logic — RESEARCH.md "Don't Hand-Roll" Pattern 4.
+
+export async function putWithQuotaGuard(
+  write: () => Promise<void>,
+  evict: () => Promise<void>,
+): Promise<void> {
+  try {
+    await write()
+  } catch (e) {
+    if (
+      e instanceof DOMException &&
+      (e.name === 'QuotaExceededError' || e.name === 'QuotaExceeded')
+    ) {
+      // Evict oldest entries, then retry the write once. If the retry also fails,
+      // give up silently — no unhandled rejection escapes (D-07).
+      await evict().catch(() => {})
+      try {
+        await write()
+      } catch {
+        // Give up silently — D-07: no unhandled rejection
+      }
+    } else {
+      // Non-quota errors fall through to the caller (preserve existing behavior)
+      throw e
+    }
+  }
+}
+
 // ─── Thumbnails store (Phase 2 — preserved) ────────────────────────────────
 
 export async function putThumbnail(record: ThumbnailRecord): Promise<void> {
-  const db = await getDb()
-  await db.put('thumbnails', record)
+  await putWithQuotaGuard(
+    async () => {
+      const db = await getDb()
+      await db.put('thumbnails', record)
+    },
+    pruneIfNeeded,
+  )
 }
 
 export async function getThumbnail(tabId: number): Promise<ThumbnailRecord | undefined> {
@@ -177,10 +213,17 @@ export async function putDomainBias(record: DomainBiasRecord): Promise<void> {
 
 /**
  * Upsert a tab state snapshot keyed by tabId.
+ * Wrapped with quota guard (D-07) — tab-state is a size-bearing store;
+ * uses pruneIfNeeded (thumbnail oldest-first eviction) as the fallback evictor.
  */
 export async function putTabState(record: TabStateSnapshot): Promise<void> {
-  const db = await getDb()
-  await db.put('tab-state', record)
+  await putWithQuotaGuard(
+    async () => {
+      const db = await getDb()
+      await db.put('tab-state', record)
+    },
+    pruneIfNeeded,
+  )
 }
 
 /**
