@@ -13,7 +13,7 @@
  */
 
 import { execSync } from 'child_process'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, rmSync } from 'fs'
 import { resolve, join } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -27,7 +27,9 @@ console.log('[package] Step 1: Running npm run build (ensures dist/ is fresh)…
 try {
   execSync('npm run build', { cwd: ROOT, stdio: 'inherit' })
 } catch (err) {
-  console.error('[package] Build failed — aborting packaging.')
+  // WR-05: surface the error details (execSync streams child output, but include
+  // the thrown message for cases where the failure is not in the child's stdout).
+  console.error('[package] Build failed — aborting packaging:', err?.message ?? err)
   process.exit(1)
 }
 
@@ -63,6 +65,12 @@ console.log(`[package] Guard passed: dist/manifest.json version=${version}, no "
 const outputZip = join(ROOT, `smart-hibernator-${version}.zip`)
 console.log(`[package] Step 3: Creating ${outputZip} …`)
 
+// WR-02: `zip -r` ADDS/UPDATES entries in an existing archive rather than replacing
+// it, so files deleted from dist/ between runs would leak into a re-used zip (e.g.
+// re-running `npm run package` without a version bump). Delete any pre-existing
+// output zip first so the archive is always built from scratch (Pitfall 6 guard).
+if (existsSync(outputZip)) rmSync(outputZip)
+
 // Use system zip CLI (verified available on Linux/macOS).
 // Zip the CONTENTS of dist/ (cd into dist first), so manifest.json is at the archive root.
 // CWS requires manifest.json at the top level of the zip, not nested inside a dist/ directory.
@@ -72,7 +80,10 @@ try {
     stdio: 'inherit',
   })
 } catch (err) {
-  console.error('[package] zip command failed. Ensure zip CLI is installed.')
+  // WR-05: surface the real error — masking it hides causes like permission denied,
+  // disk full, or a read-only dist/, not just a missing zip CLI.
+  console.error('[package] zip failed:', err?.message ?? err)
+  console.error('[package] Ensure the zip CLI is installed and the output path is writable.')
   process.exit(1)
 }
 
