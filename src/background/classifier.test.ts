@@ -1,6 +1,6 @@
-// Behavioral tests for src/background/classifier.ts — FR-05 / FR-07 / T-03-07 / T-03-09
+// Behavioral tests for src/background/classifier.ts — FR-05 / FR-07 / T-03-07 / T-03-09 / D-01 / D-05
 // Wave 0 infrastructure checks (constants) are preserved.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   AI_COLD_START_MIN_SAMPLES,
   AI_CONFIDENCE_THRESHOLD,
@@ -18,6 +18,7 @@ import {
   classifyBatch,
   ensureOffscreen,
   getDomainCategoryBoost,
+  teardownIfIdle,
 } from './classifier'
 import { countTabHistory, getTabHistoryByDomain, getDomainBias } from './idb'
 import type { TabMeta, TabHistoryRecord } from '../shared/types'
@@ -313,6 +314,116 @@ describe('ensureOffscreen (T-03-09)', () => {
 
     resolveCreate()
     await Promise.all([p1, p2])
+
+    expect(chrome.offscreen.createDocument).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// D-01 / D-05: Idle teardown timer + pending ref-count guard
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('D-01 / D-05: teardownIfIdle + pending ref-count guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    // Default: document does not exist (getContexts returns [])
+    vi.mocked(chrome.runtime.getContexts).mockResolvedValue([])
+    vi.mocked(chrome.offscreen.createDocument).mockResolvedValue(undefined)
+    vi.mocked(chrome.offscreen.closeDocument).mockResolvedValue(undefined)
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({ ok: true })
+    // Default storage mocks for classifyBatch
+    vi.mocked(countTabHistory).mockResolvedValue(100)
+    vi.mocked(getTabHistoryByDomain).mockResolvedValue([makeHistoryRow({ domain: 'example.com' })])
+    vi.mocked(getDomainBias).mockResolvedValue(undefined)
+    vi.mocked(chrome.storage.local.get).mockResolvedValue({ ai_classifications: {} })
+    vi.mocked(chrome.storage.local.set).mockResolvedValue(undefined)
+    vi.mocked(chrome.tabs.query).mockResolvedValue([{ id: 1 } as chrome.tabs.Tab])
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('D-05: teardownIfIdle does NOT call closeDocument when pending > 0', async () => {
+    // Start a classifyBatch that is in-flight (blocked on sendMessage)
+    let resolveSend!: (v: unknown) => void
+    vi.mocked(chrome.runtime.sendMessage).mockImplementation((msg) => {
+      if ((msg as any).type === 'CLASSIFY_BATCH') {
+        return new Promise((res) => { resolveSend = res })
+      }
+      return Promise.resolve({ ok: true })
+    })
+
+    const batchPromise = classifyBatch([{ tabId: 1, url: 'https://example.com', meta: makeMeta() }])
+
+    // While batch is in-flight, call teardownIfIdle — should be a no-op
+    await teardownIfIdle()
+
+    expect(chrome.offscreen.closeDocument).not.toHaveBeenCalled()
+
+    // Resolve the in-flight batch
+    resolveSend({ results: [{ tabId: 1, label: 'Vital', confidence: 0.9 }] })
+    await batchPromise
+  })
+
+  it('D-05: teardownIfIdle calls RELEASE_SESSION + closeDocument when pending === 0', async () => {
+    // pending is 0 by default (no classifyBatch in flight)
+    await teardownIfIdle()
+
+    // Should have sent RELEASE_SESSION message
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'RELEASE_SESSION' })
+    )
+    // Should have called closeDocument
+    expect(chrome.offscreen.closeDocument).toHaveBeenCalledTimes(1)
+  })
+
+  it('D-01: teardownIfIdle does not throw when RELEASE_SESSION sendMessage rejects', async () => {
+    vi.mocked(chrome.runtime.sendMessage).mockRejectedValue(new Error('doc gone'))
+    await expect(teardownIfIdle()).resolves.toBeUndefined()
+    // closeDocument should still be attempted
+    expect(chrome.offscreen.closeDocument).toHaveBeenCalledTimes(1)
+  })
+
+  it('D-01: teardownIfIdle does not throw when closeDocument rejects', async () => {
+    vi.mocked(chrome.offscreen.closeDocument).mockRejectedValue(new Error('already closed'))
+    await expect(teardownIfIdle()).resolves.toBeUndefined()
+  })
+
+  it('D-01: armIdleTeardown fires after OFFSCREEN_IDLE_MS and tears down when idle', async () => {
+    const { OFFSCREEN_IDLE_MS } = await import('../shared/constants')
+
+    // Run a classify batch to completion (arms the timer)
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({
+      results: [{ tabId: 1, label: 'Vital', confidence: 0.9 }],
+    })
+    await classifyBatch([{ tabId: 1, url: 'https://example.com', meta: makeMeta() }])
+
+    // Timer is armed — advance past OFFSCREEN_IDLE_MS
+    vi.advanceTimersByTime(OFFSCREEN_IDLE_MS + 1)
+    // Allow microtasks to flush
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(chrome.offscreen.closeDocument).toHaveBeenCalledTimes(1)
+  })
+
+  it('D-01 / D-05: recreate-on-demand — after closeDocument, next classifyBatch calls createDocument again', async () => {
+    // Step 1: tear down
+    await teardownIfIdle()
+    expect(chrome.offscreen.closeDocument).toHaveBeenCalledTimes(1)
+
+    // Step 2: mock getContexts to return [] (document is closed)
+    vi.mocked(chrome.runtime.getContexts).mockResolvedValue([])
+    vi.mocked(chrome.offscreen.createDocument).mockResolvedValue(undefined)
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({
+      results: [{ tabId: 1, label: 'Vital', confidence: 0.9 }],
+    })
+
+    // Step 3: next classifyBatch should recreate
+    await classifyBatch([{ tabId: 1, url: 'https://example.com', meta: makeMeta() }])
 
     expect(chrome.offscreen.createDocument).toHaveBeenCalledTimes(1)
   })
