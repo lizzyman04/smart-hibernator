@@ -2,6 +2,32 @@
 // No imports — content scripts are standalone globals-only files in this project.
 // Constants are inlined (identical values to src/shared/constants.ts).
 
+// ── D-06: Restricted-URL guard ─────────────────────────────────────────────
+// Inlined denylist (identical values to src/shared/restricted-urls.ts).
+// Content scripts are import-free — constants are duplicated here per project convention
+// (same pattern as DEBOUNCE_MS/MAX_FIELDS being inlined from shared/constants.ts).
+const INLINED_RESTRICTED_PREFIXES = [
+  'chrome://',
+  'chrome-extension://',
+  'edge://',
+  'about:',
+  'devtools://',
+  'view-source:',
+  'chrome-untrusted://',
+  'https://chromewebstore.google.com',
+  'https://chrome.google.com/webstore',
+]
+
+// Check the current page URL before any listener registration or messaging.
+// On restricted pages (chrome://, extension pages, CWS store), this flag is false
+// and all event listener registration and sendMessage calls are skipped (no console errors).
+const _href = (typeof location !== 'undefined' ? location.href : '') ?? ''
+const _isPageInjectable: boolean =
+  (_href.startsWith('http://') || _href.startsWith('https://')) &&
+  !INLINED_RESTRICTED_PREFIXES.some((p) => _href.startsWith(p))
+
+// ── End D-06 guard ─────────────────────────────────────────────────────────
+
 const WATCHED_SELECTORS = 'input, textarea, select'
 
 // Phase 4 — State Restoration constants (identical to shared/constants.ts)
@@ -50,11 +76,13 @@ function reportFormActivity(): void {
   })
 }
 
-document.addEventListener('keydown', (e) => {
-  if ((e.target as Element)?.matches(WATCHED_SELECTORS)) {
-    reportFormActivity()
-  }
-})
+if (_isPageInjectable) {
+  document.addEventListener('keydown', (e) => {
+    if ((e.target as Element)?.matches(WATCHED_SELECTORS)) {
+      reportFormActivity()
+    }
+  })
+}
 
 // ── Capture path ──────────────────────────────────────────────────────────
 
@@ -146,32 +174,34 @@ function scheduleCapture(): void {
   debounceTimer = setTimeout(sendSnapshot, DEBOUNCE_MS)
 }
 
-// Capture triggers: scroll, input, change
-window.addEventListener('scroll', scheduleCapture, { passive: true })
+if (_isPageInjectable) {
+  // Capture triggers: scroll, input, change
+  window.addEventListener('scroll', scheduleCapture, { passive: true })
 
-document.addEventListener('input', (e) => {
-  // Also triggers existing FORM_ACTIVITY for form protection
-  if ((e.target as Element)?.matches(WATCHED_SELECTORS)) {
-    reportFormActivity()
-  }
-  scheduleCapture()
-})
+  document.addEventListener('input', (e) => {
+    // Also triggers existing FORM_ACTIVITY for form protection
+    if ((e.target as Element)?.matches(WATCHED_SELECTORS)) {
+      reportFormActivity()
+    }
+    scheduleCapture()
+  })
 
-document.addEventListener('change', scheduleCapture, { passive: true })
+  document.addEventListener('change', scheduleCapture, { passive: true })
 
-// Flush on pagehide (navigation, potential discard)
-window.addEventListener('pagehide', () => {
-  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
-  sendSnapshot()
-})
-
-// Flush on visibilitychange → hidden (tab backgrounded)
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') {
+  // Flush on pagehide (navigation, potential discard)
+  window.addEventListener('pagehide', () => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
     sendSnapshot()
-  }
-})
+  })
+
+  // Flush on visibilitychange → hidden (tab backgrounded)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+      sendSnapshot()
+    }
+  })
+}
 
 // ── Restore path ──────────────────────────────────────────────────────────
 
@@ -253,8 +283,11 @@ export function startRestore(snapshot: LocalTabStateSnapshot): void {
 // ── GET_STATE pull on module load (D-08) ─────────────────────────────────
 
 // Callback overload (NOT Promise form) — Chrome 120 compat (COMP-01)
-chrome.runtime.sendMessage({ type: 'GET_STATE', url: location.href }, (snapshot) => {
-  if (chrome.runtime.lastError) return   // SW not ready — skip restore
-  if (!snapshot) return                  // no stored state for this tab
-  startRestore(snapshot as LocalTabStateSnapshot)
-})
+// Guard: only pull state on injectable pages (D-06)
+if (_isPageInjectable) {
+  chrome.runtime.sendMessage({ type: 'GET_STATE', url: location.href }, (snapshot) => {
+    if (chrome.runtime.lastError) return   // SW not ready — skip restore
+    if (!snapshot) return                  // no stored state for this tab
+    startRestore(snapshot as LocalTabStateSnapshot)
+  })
+}
