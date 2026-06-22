@@ -347,10 +347,17 @@ describe('D-01 / D-05: teardownIfIdle + pending ref-count guard', () => {
   })
 
   it('D-05: teardownIfIdle does NOT call closeDocument when pending > 0', async () => {
-    // Start a classifyBatch that is in-flight (blocked on sendMessage)
+    // Start a classifyBatch that is in-flight (blocked on CLASSIFY_BATCH sendMessage).
+    // We use a two-step unlock: classifyBatch must pass ensureOffscreen() + feature building
+    // and reach pending++ BEFORE teardownIfIdle is called — otherwise pending is still 0.
     let resolveSend!: (v: unknown) => void
+    // Signal that classifyBatch has entered the critical section (pending > 0)
+    let signalInFlight!: () => void
+    const inFlightSignal = new Promise<void>((res) => { signalInFlight = res })
+
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((msg) => {
       if ((msg as any).type === 'CLASSIFY_BATCH') {
+        signalInFlight() // pending++ has already run; now we're inside the critical section
         return new Promise((res) => { resolveSend = res })
       }
       return Promise.resolve({ ok: true })
@@ -358,7 +365,10 @@ describe('D-01 / D-05: teardownIfIdle + pending ref-count guard', () => {
 
     const batchPromise = classifyBatch([{ tabId: 1, url: 'https://example.com', meta: makeMeta() }])
 
-    // While batch is in-flight, call teardownIfIdle — should be a no-op
+    // Wait until classifyBatch has entered the critical section (pending++ done)
+    await inFlightSignal
+
+    // NOW call teardownIfIdle — pending > 0, should be a no-op
     await teardownIfIdle()
 
     expect(chrome.offscreen.closeDocument).not.toHaveBeenCalled()
