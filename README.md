@@ -88,7 +88,7 @@ The AI runs **only on your device**: features are extracted from local tab histo
 
 ### From the Chrome Web Store
 
-*Coming soon.*
+*Submission pending — see [docs/STORE-LISTING.md](docs/STORE-LISTING.md) for the launch checklist.*
 
 ### Manual installation (developer mode)
 
@@ -120,6 +120,7 @@ Then:
 npm install          # Install dependencies
 npm run dev          # Dev server with hot reload (CRXJS)
 npm run build        # Production build → dist/
+npm run package      # Production build + zip → smart-hibernator-<version>.zip (CWS upload)
 npm test             # Unit + component tests (Vitest)
 npm run test:e2e     # End-to-end browser tests (Playwright)
 ```
@@ -184,16 +185,17 @@ Smart Hibernator is **privacy-first by design**:
 - **AI runs entirely locally** — inference and learning happen on your machine.
 - **Sensitive form fields are never captured** during state restoration.
 
-Requested permissions and why they are needed:
+For the full privacy statement including source-level verification, see [PRIVACY.md](PRIVACY.md).
+
+Requested permissions and why they are needed (see [PERMISSIONS.md](PERMISSIONS.md) for detailed justifications):
 
 | Permission | Why |
 |------------|-----|
+| `storage` | Persist settings, stats, allowlists, and AI classification cache. |
 | `tabs` | Detect inactivity and discard/restore tabs. |
-| `storage` | Persist settings, stats, and allowlists. |
 | `alarms` | Periodically check which tabs should hibernate. |
 | `contextMenus` | Right-click controls for hibernating/protecting tabs. |
-| `scripting` | Capture and restore page state. |
-| `activeTab` | Act on the current tab from the popup/shortcut. |
+| `activeTab` | Capture visible-tab thumbnails; act on the current tab from the popup/shortcut. |
 | `offscreen` | Run the ONNX model outside the service worker. |
 
 ---
