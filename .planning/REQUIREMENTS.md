@@ -74,7 +74,7 @@ Smart Hibernator is a privacy-first, local-AI driven Chrome extension that intel
 | FR-10 | Phase 2 | Pending |
 | FR-11 | Phase 4 | Complete |
 | FR-12 | Phase 4 | Complete |
-| NFR-01 | Phase 5 | Pending |
+| NFR-01 | Phase 5 | Complete |
 | NFR-02 | Phase 3 | Complete |
 | NFR-03 | Phase 3 | Complete |
 | NFR-04 | Phase 3 | Complete |

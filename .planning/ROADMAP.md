@@ -6,7 +6,7 @@
 - [x] **Phase 2: UI & Rich Previews** - Visual feedback, thumbnails, and central savings dashboard.
 - [x] **Phase 3: AI Intelligence** - Local ONNX-based tab vitality classification and dynamic timeouts. (completed 2026-05-14)
 - [x] **Phase 4: Perfect State Restoration** - Seamless wake-up with preserved scroll and form state. (completed 2026-06-14)
-- [ ] **Phase 5: Polishing & Launch** - Performance optimization, edge-case hardening, and CWS preparation.
+- [x] **Phase 5: Polishing & Launch** - Performance optimization, edge-case hardening, and CWS preparation. (completed 2026-06-22)
 
 ## Phase Details
 
@@ -86,7 +86,7 @@ Plans:
 - [x] 05-02-PLAN.md — Wave 1: Edge-case hardening — restricted-page no-op, IDB quota, churn/startup/cold-start (D-06/D-07/D-08)
 - [x] 05-03-PLAN.md — Wave 1: Permissions trim + manifest polish + PERMISSIONS.md + packaging zip (D-03/D-04/D-09)
 - [x] 05-04-PLAN.md — Wave 1: Cross-OS CSS normalization (scrollbars + fonts) in popup/dashboard (D-13 fix)
-- [ ] 05-05-PLAN.md — Wave 2: Launch docs (PRIVACY/runbook/screenshots/listing/README) + manual NFR-01 RAM gate + per-OS screenshot gate (D-10/D-11/D-12/D-02/D-13)
+- [x] 05-05-PLAN.md — Wave 2: Launch docs (PRIVACY/runbook/screenshots/listing/README) + manual NFR-01 RAM gate + per-OS screenshot gate (D-10/D-11/D-12/D-02/D-13)
 **UI hint**: yes
 
 ## Progress Table
@@ -97,4 +97,4 @@ Plans:
 | 2. UI & Rich Previews | 4/4 | Complete | 02-01, 02-02, 02-03, 02-04 done (2026-05-03) |
 | 3. AI Intelligence | 4/4 | Complete   | 2026-05-14 |
 | 4. Perfect State Restoration | 3/3 | Complete   | 2026-06-14 |
-| 5. Polishing & Launch | 0/5 | Not started | - |
+| 5. Polishing & Launch | 5/5 | Complete   | 2026-06-22 |
