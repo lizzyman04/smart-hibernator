@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "Smart Hibernator",
   "description": "Intelligent tab hibernation to save RAM and battery.",
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "homepage_url": "https://github.com/lizzyman04/smart-hibernator",
   "action": {
     "default_popup": "src/popup/index.html",
     "default_icon": {
@@ -37,7 +38,6 @@
     "tabs",
     "alarms",
     "contextMenus",
-    "scripting",
     "activeTab",
     "offscreen"
   ],
