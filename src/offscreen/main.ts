@@ -125,6 +125,27 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .catch(() => sendResponse({ results: [] }))
     return true // keep channel open for async response
   }
+
+  // D-01: RELEASE_SESSION — called by classifier.ts teardownIfIdle() before closeDocument().
+  // Releases the ORT InferenceSession (belt) and nulls BOTH session + sessionInit so a
+  // recreated offscreen document re-inits cleanly.
+  // NOTE: the actual memory reclaim is guaranteed by chrome.offscreen.closeDocument() in
+  // classifier.ts, not by release() — so NFR-01 does not hinge on ORT internal cleanup.
+  // release() is the documented-API cleanliness step per RESEARCH Pattern 2 / D-01.
+  if (message?.type === 'RELEASE_SESSION') {
+    ;(async () => {
+      try {
+        if (session) await session.release()
+      } finally {
+        // Null BOTH so a recreated document re-inits the session from scratch (D-01 / T-05-04)
+        session = null
+        sessionInit = null
+      }
+    })()
+      .then(() => sendResponse({ ok: true }))
+      .catch(() => sendResponse({ ok: true })) // always respond ok; close handles the reclaim
+    return true // keep channel open for async response (Chrome 120 / COMP-01)
+  }
 })
 
 // ─── DOMContentLoaded warm-up ───────────────────────────────────────────────

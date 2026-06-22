@@ -1,12 +1,14 @@
 // Tab vitality classifier — feature vector assembly, offscreen lifecycle, batch classification.
 // Analog: src/background/thumbnail.ts (same service utility role in SW context).
 // Per RESEARCH.md Patterns 1, 3, 6; Pitfalls 2 and 5; D-02, D-07, D-11, T-03-06/07/09.
+// Phase 5: D-01/D-05 idle teardown + pending ref-count guard (Pattern 1).
 import { getTabHistoryByDomain, getDomainBias, countTabHistory } from './idb'
 import {
   AI_COLD_START_MIN_SAMPLES,
   AI_HISTORY_WINDOW_MS,
   VITAL_DOMAINS,
   DEAD_DOMAINS,
+  OFFSCREEN_IDLE_MS,
 } from '../shared/constants'
 import type { ClassificationResult, TabMeta, TabVitality } from '../shared/types'
 
@@ -90,9 +92,52 @@ export async function buildFeaturesForTab(
 }
 
 // ─── Offscreen Document lifecycle (RESEARCH Pattern 1 + Pitfall 2 / T-03-09) ─
+// Phase 5 additions: D-01 idle teardown + D-05 in-flight race guard.
+//
+// Architecture:
+//   pending    — ref-count of active CLASSIFY_BATCH round-trips (D-05 correctness requirement)
+//   idleTimer  — SW-side setTimeout(teardownIfIdle, OFFSCREEN_IDLE_MS); re-armed after each burst
+//
+// NOTE: A SW-side setTimeout will not fire if the SW is suspended — that is acceptable and
+// even desirable: if the SW dies, Chrome tears down the offscreen doc anyway (or it survives
+// and getContexts() cheaply detects/reuses it). The idle timer is an OPTIMIZATION for RAM;
+// the `pending` guard is the CORRECTNESS requirement (D-05 / T-05-01). Never scatter
+// closeDocument() into hibernation.ts or index.ts — this file is the lifecycle chokepoint.
 
 /** Module-level promise guard prevents concurrent createDocument calls */
 let creatingOffscreen: Promise<void> | null = null
+
+/** D-05: ref-count of active CLASSIFY_BATCH round-trips — teardownIfIdle early-returns when > 0 */
+let pending = 0
+
+/** D-01: handle to the idle-teardown timer — cleared and re-armed after each classifyBatch burst */
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * (Re)arm the idle-teardown timer. Clears any prior timer so each burst resets the window.
+ * Called in the finally block of classifyBatch so the window starts AFTER the burst finishes.
+ * @internal exported for testing only
+ */
+function armIdleTeardown(): void {
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => {
+    teardownIfIdle().catch(() => {})
+  }, OFFSCREEN_IDLE_MS)
+}
+
+/**
+ * Tear down the offscreen document when no classification is in flight (D-01 / D-05).
+ * 1. Early-returns when pending > 0 — never closes while CLASSIFY_BATCH is in progress.
+ * 2. Sends RELEASE_SESSION to let the offscreen doc release() the ORT session (belt).
+ * 3. Calls closeDocument() to destroy the WASM context and reclaim RAM (suspenders = NFR-01 lever).
+ * Both steps are individually try/catch-swallowed because the doc may already be gone.
+ * Exported for direct invocation in tests (fake-timer control).
+ */
+export async function teardownIfIdle(): Promise<void> {
+  if (pending > 0) return // D-05: never tear down mid-inference (T-05-01)
+  try { await chrome.runtime.sendMessage({ type: 'RELEASE_SESSION' }) } catch { /* doc may be gone */ }
+  try { await chrome.offscreen.closeDocument() } catch { /* already closed */ }
+}
 
 /**
  * Ensure the Offscreen Document is alive before sending CLASSIFY_BATCH messages.
@@ -155,10 +200,19 @@ export async function classifyBatch(
 
     if (toClassify.length === 0) return
 
-    const response = (await chrome.runtime.sendMessage({
-      type: 'CLASSIFY_BATCH',
-      tabs: toClassify,
-    })) as { results: Array<{ tabId: number; label: TabVitality | null; confidence: number }> }
+    // D-05: increment pending BEFORE sendMessage so teardownIfIdle cannot fire mid-inference.
+    // pending-- runs in finally so it decrements even when sendMessage throws (T-05-01).
+    pending++
+    let response: { results: Array<{ tabId: number; label: TabVitality | null; confidence: number }> }
+    try {
+      response = (await chrome.runtime.sendMessage({
+        type: 'CLASSIFY_BATCH',
+        tabs: toClassify,
+      })) as { results: Array<{ tabId: number; label: TabVitality | null; confidence: number }> }
+    } finally {
+      pending--
+      armIdleTeardown() // D-01: re-arm idle timer after each burst; resets the window
+    }
 
     // Read existing classification cache
     const current = await chrome.storage.local.get('ai_classifications')

@@ -1,8 +1,8 @@
-// Tests for src/offscreen/main.ts — FR-05 / NFR-03 / NFR-04 behavioral assertions.
+// Tests for src/offscreen/main.ts — FR-05 / NFR-03 / NFR-04 / D-01 behavioral assertions.
 //
 // Testing strategy notes:
-// - vi.hoisted() declares createMock/runMock BEFORE the top-level vi.mock() factory runs,
-//   making them available in both the factory and test bodies.
+// - vi.hoisted() declares createMock/runMock/releaseMock BEFORE the top-level vi.mock()
+//   factory runs, making them available in both the factory and test bodies.
 // - Listeners registered via chrome.runtime.onMessage.addListener are invoked via
 //   vitest-chrome's callListeners() helper (vitest-chrome is a real event emitter,
 //   not a vi.fn() spy — addListener does not have a .mock property).
@@ -10,19 +10,23 @@
 //   to get a fresh module instance with a fresh session singleton per test.
 // - NFR-04 uses vi.spyOn(global, 'fetch') to assert all URLs start with chrome-extension://.
 // - navigator.gpu is set via Object.defineProperty (not defined in jsdom by default).
+// - D-01 RELEASE_SESSION tests are LAST because they call vi.restoreAllMocks() which
+//   can affect the accumulated listener state; they must not precede NFR-03 tests.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // vi.hoisted() executes BEFORE vi.mock() factories — the only way to share mocks
 // between the factory and test code when using the top-level mock pattern.
-const { runMock, createMock } = vi.hoisted(() => {
+const { runMock, releaseMock, createMock } = vi.hoisted(() => {
   const runMock = vi.fn().mockResolvedValue({
     output_probability: {
       data: new Float32Array([0.1, 0.2, 0.7]),
       dims: [1, 3],
     },
   })
-  const createMock = vi.fn().mockImplementation(async () => ({ run: runMock }))
-  return { runMock, createMock }
+  // releaseMock shared so RELEASE_SESSION tests can assert it was called on the shared session
+  const releaseMock = vi.fn().mockResolvedValue(undefined)
+  const createMock = vi.fn().mockImplementation(async () => ({ run: runMock, release: releaseMock }))
+  return { runMock, releaseMock, createMock }
 })
 
 // Top-level mock — hoisted before all imports by vitest
@@ -94,7 +98,7 @@ describe('offscreen/main behavioral tests', () => {
         dims: [1, 3],
       },
     })
-    createMock.mockImplementation(async () => ({ run: runMock }))
+    createMock.mockImplementation(async () => ({ run: runMock, release: releaseMock }))
 
     // Stub fetch so session init succeeds with an empty ArrayBuffer
     vi.spyOn(global, 'fetch').mockResolvedValue(
@@ -305,5 +309,84 @@ describe('NFR-03: executionProviders selection', () => {
     expect(localCreate.mock.calls.length).toBeGreaterThan(0)
     const opts = localCreate.mock.calls[0][1] as { executionProviders: string[] }
     expect(opts.executionProviders).toEqual(['wasm'])
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// D-01: RELEASE_SESSION handler
+// Placed LAST to avoid listener accumulation interfering with NFR-03 tests.
+// Uses the same shared module (imported in the behavioral tests beforeEach).
+// The shared createMock returns a session with release: releaseMock so these
+// tests can assert session.release() was called on the module-level singleton.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('D-01: RELEASE_SESSION handler', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    releaseMock.mockResolvedValue(undefined)
+    runMock.mockResolvedValue({
+      output_probability: {
+        data: new Float32Array([0.1, 0.2, 0.7]),
+        dims: [1, 3],
+      },
+    })
+    createMock.mockImplementation(async () => ({ run: runMock, release: releaseMock }))
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(new ArrayBuffer(8), { status: 200 }) as Response
+    )
+    await import('./main')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  async function dispatch(message: Record<string, unknown>): Promise<unknown> {
+    return new Promise((resolve) => {
+      ;(chrome.runtime.onMessage as any).callListeners(message, {}, (response: unknown) => {
+        resolve(response)
+      })
+    })
+  }
+
+  it('D-01: RELEASE_SESSION responds { ok: true } after session is warmed up', async () => {
+    // Warm up the session first
+    await dispatch({ type: 'CLASSIFY_BATCH', tabs: [{ tabId: 1, features: [0, 0, 0, 0, 0, 0] }] })
+    const response = await dispatch({ type: 'RELEASE_SESSION' })
+    expect(response).toEqual({ ok: true })
+  })
+
+  it('D-01: RELEASE_SESSION calls session.release() when session is non-null', async () => {
+    // Warm up so session is non-null
+    await dispatch({ type: 'CLASSIFY_BATCH', tabs: [{ tabId: 1, features: [0, 0, 0, 0, 0, 0] }] })
+    releaseMock.mockClear() // clear any prior calls from warm-up
+    await dispatch({ type: 'RELEASE_SESSION' })
+    expect(releaseMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('D-01: RELEASE_SESSION is idempotent — responds { ok: true } even when session is null', async () => {
+    // Do NOT warm up — module session may or may not be null due to prior tests.
+    // Call twice to assert idempotency regardless of initial session state.
+    await dispatch({ type: 'RELEASE_SESSION' })
+    const response2 = await dispatch({ type: 'RELEASE_SESSION' })
+    expect(response2).toEqual({ ok: true })
+  })
+
+  it('D-01: RELEASE_SESSION still responds { ok: true } even when session.release() rejects', async () => {
+    releaseMock.mockRejectedValue(new Error('ORT dispose error'))
+    // Warm up the session
+    await dispatch({ type: 'CLASSIFY_BATCH', tabs: [{ tabId: 1, features: [0, 0, 0, 0, 0, 0] }] })
+    const response = await dispatch({ type: 'RELEASE_SESSION' })
+    expect(response).toEqual({ ok: true })
+  })
+
+  it('D-01: only one onMessage.addListener call exists in main.ts (top-level listener invariant)', async () => {
+    // Use process.cwd() + known relative path — import.meta.url is unreliable in worktree
+    const fs = await import('fs')
+    const path = await import('path')
+    const sourcePath = path.resolve(process.cwd(), 'src/offscreen/main.ts')
+    const source = fs.readFileSync(sourcePath, 'utf8')
+    const addListenerCount = (source.match(/onMessage\.addListener/g) ?? []).length
+    expect(addListenerCount).toBe(1)
   })
 })

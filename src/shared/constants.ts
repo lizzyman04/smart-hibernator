@@ -39,6 +39,13 @@ export const VITAL_DOMAINS: readonly string[] = [
 /** Preset dead domains — empty by default; user-driven via Keep Alive negative space (D-02) */
 export const DEAD_DOMAINS: readonly string[] = []
 
+// Phase 5 — Polishing & Launch constants
+
+/** D-01: Idle window before tearing down the offscreen document (closeDocument).
+ * ~10 min — far above the 1-min alarm period so an actively-classifying browser
+ * never tears down between ticks. Only fires when genuinely idle (Pitfall 1). */
+export const OFFSCREEN_IDLE_MS = 10 * 60 * 1000
+
 // Phase 4 — State Restoration constants
 
 /** D-01: scroll/input debounce interval before sending SAVE_STATE to SW */
