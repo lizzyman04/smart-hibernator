@@ -1,15 +1,18 @@
 ---
-gsd_state_version: 1.0
+gsd_state_version: "1.0"
 milestone: v1.0
-milestone_name: milestone
+current_phase: 05
+current_phase_name: Polishing & Launch
 status: milestone_complete
-last_updated: "2026-06-22T17:15:32.041Z"
+stopped_at: Completed 05-06-PLAN.md
+last_updated: "2026-10-03T05:14:25.037Z"
+state_head: 5c85e131d6a56ba339447ee5669e8bb877073abb
 progress:
   total_phases: 5
-  completed_phases: 6
-  total_plans: 20
-  completed_plans: 20
-  percent: 120
+  completed_phases: 1
+  total_plans: 21
+  completed_plans: 21
+milestone_name: milestone
 ---
 
 # Project State - Smart Hibernator
@@ -22,8 +25,8 @@ progress:
 
 ## Current Position
 
-Phase: 05
-Plan: Not started
+Phase: 05 (Polishing & Launch) — EXECUTING
+Plan: 2 of 6
 **Phase**: 4 (Perfect State Restoration)
 **Plan**: 04-03 COMPLETE (3/3 Phase 4 plans done)
 **Status**: READY FOR VERIFICATION
@@ -48,6 +51,12 @@ Plan: Not started
 - **04-01 Duration**: 300s | Tasks: 3/3 | Files: 2 created, 3 modified
 - **04-02 Duration**: 240s | Tasks: 2/2 | Files: 0 created, 2 modified
 - **04-03 Duration**: 480s | Tasks: 2/2 | Files: 0 created, 2 modified
+
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 05 P06 | 75min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -116,6 +125,14 @@ Plan: Not started
 
 ## Session Continuity
 
+**Last session:** 2026-10-03T05:14:24.874Z
+**Stopped at:** Completed 05-06-PLAN.md
+**Resume file:** None
+
 **Last Session**: 2026-06-14 — Plan 04-03 (content script capture+restore) executed. form-watcher.ts extended from 23 to 260+ lines: debounced capture, D-03 exclusions, flush handlers, GET_STATE restore, bounded MutationObserver (FR-12). form-watcher.test.ts filled (27 tests, 0 todos). TDD: RED commit afd8e81, GREEN commit 9164b3e. npm test -- src/content/form-watcher.test.ts: 27/27 passing. Phase 4 complete.
 **Next Session**: Phase 5 or /gsd-verify-work for Phase 4 gate
 **Resume file**: None
+
+## Decisions
+
+- [Phase 05]: 05-06: AI_CLASSIFICATION_TTL_MS = 60 min (must exceed OFFSCREEN_IDLE_MS); offscreen idle teardown via one-shot chrome.alarms alarm; no offscreen creation at SW boot (G-05-1)
