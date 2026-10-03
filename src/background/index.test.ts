@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handleManualHibernate } from './hibernation'
+import { OFFSCREEN_IDLE_ALARM, ALARM_NAME } from '../shared/constants'
 
 // ─── Phase 3 wiring mocks (vi.hoisted to avoid hoisting errors) ─────────────
 const { recordKeepAliveMock } = vi.hoisted(() => ({
@@ -13,8 +14,14 @@ vi.mock('./ai-learning', () => ({
   recordWakeMisclassification: vi.fn().mockResolvedValue(undefined),
 }))
 
+const { ensureOffscreenMock, teardownIfIdleMock } = vi.hoisted(() => ({
+  ensureOffscreenMock: vi.fn().mockResolvedValue(undefined),
+  teardownIfIdleMock: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('./classifier', () => ({
-  ensureOffscreen: vi.fn().mockResolvedValue(undefined),
+  ensureOffscreen: ensureOffscreenMock,
+  teardownIfIdle: teardownIfIdleMock,
   classifyBatch: vi.fn().mockResolvedValue(undefined),
   buildFeaturesForTab: vi.fn().mockResolvedValue(null),
   getDomainCategoryBoost: vi.fn().mockReturnValue(0),
@@ -53,6 +60,9 @@ vi.mock('./idb', () => ({
 
 // Import index.ts AFTER all vi.mock() calls so top-level calls use mocked deps
 import './index'
+
+// G-05-1: captured directly after import, before any beforeEach clears the mocks.
+const ensureOffscreenCallsAtBoot = ensureOffscreenMock.mock.calls.length
 
 // FR-04: Context menu click and keyboard shortcut both call handleManualHibernate(tabId).
 // Wiring verified by: grep "handleManualHibernate" src/background/index.ts
@@ -494,5 +504,40 @@ describe('badge integrity (D-08): updateBadge is a pure function of count', () =
     const { updateBadge } = await import('./badge')
     await updateBadge(3)
     expect(chrome.action.setBadgeBackgroundColor).toHaveBeenCalledWith({ color: '#F59E0B' })
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// G-05-1: offscreen lifecycle wiring
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('offscreen lifecycle wiring (G-05-1)', () => {
+  beforeEach(() => {
+    teardownIfIdleMock.mockClear()
+  })
+
+  const fireAlarm = (name: string) =>
+    (chrome.alarms.onAlarm as unknown as { callListeners: (...a: unknown[]) => void }).callListeners({
+      name,
+      scheduledTime: Date.now(),
+    })
+
+  it('importing index.ts did not call ensureOffscreen (no boot warm-up, D-01 recreate-on-demand)', () => {
+    expect(ensureOffscreenCallsAtBoot).toBe(0)
+  })
+
+  it('onAlarm OFFSCREEN_IDLE_ALARM calls teardownIfIdle once', () => {
+    fireAlarm(OFFSCREEN_IDLE_ALARM)
+    expect(teardownIfIdleMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('onAlarm with an unrelated name does not call teardownIfIdle', () => {
+    fireAlarm('SOMETHING_ELSE')
+    expect(teardownIfIdleMock).not.toHaveBeenCalled()
+  })
+
+  it('onAlarm ALARM_NAME does not call teardownIfIdle', () => {
+    fireAlarm(ALARM_NAME)
+    expect(teardownIfIdleMock).not.toHaveBeenCalled()
   })
 })

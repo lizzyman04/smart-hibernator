@@ -281,6 +281,7 @@ describe('classifyBatch (FR-05 / T-03-06)', () => {
 describe('ensureOffscreen (T-03-09)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(chrome.alarms.create).mockResolvedValue(undefined as never)
   })
 
   it('T-03-09: does not create a second document when getContexts returns a non-empty list', async () => {
@@ -333,6 +334,7 @@ describe('D-01 / D-05: teardownIfIdle + pending ref-count guard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
+    vi.mocked(chrome.alarms.create).mockResolvedValue(undefined as never)
     // Default: document does not exist (getContexts returns [])
     vi.mocked(chrome.runtime.getContexts).mockResolvedValue([])
     vi.mocked(chrome.offscreen.createDocument).mockResolvedValue(undefined)
@@ -408,22 +410,73 @@ describe('D-01 / D-05: teardownIfIdle + pending ref-count guard', () => {
     await expect(teardownIfIdle()).resolves.toBeUndefined()
   })
 
-  it('D-01: armIdleTeardown fires after OFFSCREEN_IDLE_MS and tears down when idle', async () => {
-    const { OFFSCREEN_IDLE_MS } = await import('../shared/constants')
-
-    // Run a classify batch to completion (arms the timer)
+  it('D-01 (G-05-1): a completed burst schedules the OFFSCREEN_IDLE_ALARM one-shot alarm, with no SW timer', async () => {
+    vi.setSystemTime(1_800_000_000_000)
     vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({
       results: [{ tabId: 1, label: 'Vital', confidence: 0.9 }],
     })
     await classifyBatch([{ tabId: 1, url: 'https://example.com', meta: makeMeta() }])
 
-    // Timer is armed — advance past OFFSCREEN_IDLE_MS
-    vi.advanceTimersByTime(OFFSCREEN_IDLE_MS + 1)
-    // Allow microtasks to flush
-    await Promise.resolve()
-    await Promise.resolve()
+    expect(chrome.alarms.create).toHaveBeenCalledWith(OFFSCREEN_IDLE_ALARM, {
+      when: Date.now() + OFFSCREEN_IDLE_MS,
+    })
+    expect(vi.getTimerCount()).toBe(0)
+  })
 
-    expect(chrome.offscreen.closeDocument).toHaveBeenCalledTimes(1)
+  it('G-05-1: a fresh (non-burst) classifyBatch does not touch the idle alarm', async () => {
+    const meta: TabMeta = { lastActiveAt: Date.now() - 10 * 60_000 }
+    const features = await buildFeaturesForTab(1, 'https://example.com', meta)
+    const featureKey = classificationFeatureKey('https://example.com', features!)
+    const inferredAt = Date.now() - 5 * 60_000
+    vi.mocked(chrome.storage.local.get).mockResolvedValue({
+      ai_classifications: {
+        1: { label: 'Dead', confidence: 0.8, cachedAt: inferredAt, inferredAt, featureKey },
+      },
+    })
+    await classifyBatch([{ tabId: 1, url: 'https://example.com', meta }])
+
+    expect(chrome.alarms.create).not.toHaveBeenCalled()
+  })
+
+  it('G-05-1: ensureOffscreen that creates the document schedules the alarm after createDocument resolves', async () => {
+    const order: string[] = []
+    vi.mocked(chrome.offscreen.createDocument).mockImplementation((async () => {
+      order.push('create')
+    }) as never)
+    vi.mocked(chrome.alarms.create).mockImplementation((() => {
+      order.push('alarm')
+      return Promise.resolve()
+    }) as never)
+
+    await ensureOffscreen()
+
+    expect(order).toEqual(['create', 'alarm'])
+  })
+
+  it('G-05-1: ensureOffscreen that finds an existing document does not schedule the alarm', async () => {
+    vi.mocked(chrome.runtime.getContexts).mockResolvedValue([{} as chrome.runtime.ExtensionContext])
+    await ensureOffscreen()
+    expect(chrome.alarms.create).not.toHaveBeenCalled()
+  })
+
+  it('D-05 (G-05-1): pending spans ensureOffscreen — teardownIfIdle cannot close while createDocument is parked', async () => {
+    let resolveCreate!: () => void
+    const created = new Promise<void>((res) => { resolveCreate = res })
+    vi.mocked(chrome.offscreen.createDocument).mockReturnValue(created as never)
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({
+      results: [{ tabId: 1, label: 'Vital', confidence: 0.9 }],
+    })
+
+    const batch = classifyBatch([{ tabId: 1, url: 'https://example.com', meta: makeMeta() }])
+    // Let classifyBatch reach the parked createDocument
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+    expect(chrome.offscreen.createDocument).toHaveBeenCalledTimes(1)
+
+    await teardownIfIdle()
+    expect(chrome.offscreen.closeDocument).not.toHaveBeenCalled()
+
+    resolveCreate()
+    await batch
   })
 
   it('D-01 / D-05: recreate-on-demand — after closeDocument, next classifyBatch calls createDocument again', async () => {
@@ -544,6 +597,7 @@ describe('classifyBatch freshness gate (G-05-1)', () => {
     vi.useFakeTimers()
     vi.setSystemTime(NOW)
     vi.clearAllMocks()
+    vi.mocked(chrome.alarms.create).mockResolvedValue(undefined as never)
     vi.mocked(chrome.runtime.getContexts).mockResolvedValue([])
     vi.mocked(chrome.offscreen.createDocument).mockResolvedValue(undefined)
     vi.mocked(chrome.offscreen.closeDocument).mockResolvedValue(undefined)

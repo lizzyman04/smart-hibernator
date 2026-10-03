@@ -13,6 +13,7 @@ import {
   DEAD_DOMAINS,
   OFFSCREEN_IDLE_MS,
   AI_CLASSIFICATION_TTL_MS,
+  OFFSCREEN_IDLE_ALARM,
 } from '../shared/constants'
 import type { ClassificationResult, TabMeta, TabVitality } from '../shared/types'
 
@@ -139,34 +140,43 @@ export function isClassificationStale(
 // Phase 5 additions: D-01 idle teardown + D-05 in-flight race guard.
 //
 // Architecture:
-//   pending    — ref-count of active CLASSIFY_BATCH round-trips (D-05 correctness requirement)
-//   idleTimer  — SW-side setTimeout(teardownIfIdle, OFFSCREEN_IDLE_MS); re-armed after each burst
+//   pending    — ref-count spanning ensureOffscreen() plus the CLASSIFY_BATCH round-trip
+//                (D-05 correctness requirement)
+//   idle alarm — one-shot chrome.alarms alarm OFFSCREEN_IDLE_ALARM at now + OFFSCREEN_IDLE_MS;
+//                re-created (same name replaces the pending alarm) after each burst and when
+//                a document is created. index.ts routes it to teardownIfIdle().
 //
-// NOTE: A SW-side setTimeout will not fire if the SW is suspended — that is acceptable and
-// even desirable: if the SW dies, Chrome tears down the offscreen doc anyway (or it survives
-// and getContexts() cheaply detects/reuses it). The idle timer is an OPTIMIZATION for RAM;
-// the `pending` guard is the CORRECTNESS requirement (D-05 / T-05-01). Never scatter
-// closeDocument() into hibernation.ts or index.ts — this file is the lifecycle chokepoint.
+// NOTE: The original design used an in-memory SW setTimeout on the premise that losing the
+// timer on SW suspension is harmless because Chrome closes the document anyway. UAT G-05-1
+// disproved that: the document persisted 13+ idle minutes, and WORKERS-reason offscreen
+// documents outlive the SW. Chrome persists alarms across SW suspension, so teardown is now
+// alarm-scheduled. This deliberately supersedes the 05-RESEARCH.md anti-pattern against using
+// an alarm for teardown. No manifest change is needed (the alarms permission is already
+// declared and justified per D-04), and a mid-burst firing is neutralized by the `pending`
+// guard plus the in-flight burst's finally re-arm.
+// Never scatter closeDocument() into hibernation.ts or index.ts — this file is the lifecycle
+// chokepoint.
+//
+// G-05-1 freshness gate: classifyBatch only touches the document when a candidate is stale,
+// so an idle browser stops re-arming the window every tick.
 
 /** Module-level promise guard prevents concurrent createDocument calls */
 let creatingOffscreen: Promise<void> | null = null
 
-/** D-05: ref-count of active CLASSIFY_BATCH round-trips — teardownIfIdle early-returns when > 0 */
+/** D-05: ref-count of active offscreen bursts — teardownIfIdle early-returns when > 0 */
 let pending = 0
 
-/** D-01: handle to the idle-teardown timer — cleared and re-armed after each classifyBatch burst */
-let idleTimer: ReturnType<typeof setTimeout> | null = null
-
 /**
- * (Re)arm the idle-teardown timer. Clears any prior timer so each burst resets the window.
- * Called in the finally block of classifyBatch so the window starts AFTER the burst finishes.
- * @internal exported for testing only
+ * (Re)schedule the idle-teardown alarm for now + OFFSCREEN_IDLE_MS. Creating an alarm with an
+ * existing name replaces it, so each burst resets the window, but unlike a SW timer Chrome
+ * persists it across service-worker suspension (G-05-1). Failures are swallowed.
  */
-function armIdleTeardown(): void {
-  if (idleTimer) clearTimeout(idleTimer)
-  idleTimer = setTimeout(() => {
-    teardownIfIdle().catch(() => {})
-  }, OFFSCREEN_IDLE_MS)
+async function armIdleTeardown(): Promise<void> {
+  try {
+    await chrome.alarms.create(OFFSCREEN_IDLE_ALARM, { when: Date.now() + OFFSCREEN_IDLE_MS })
+  } catch {
+    /* alarms unavailable — document will be reclaimed on the next burst's arm */
+  }
 }
 
 /**
@@ -175,7 +185,7 @@ function armIdleTeardown(): void {
  * 2. Sends RELEASE_SESSION to let the offscreen doc release() the ORT session (belt).
  * 3. Calls closeDocument() to destroy the WASM context and reclaim RAM (suspenders = NFR-01 lever).
  * Both steps are individually try/catch-swallowed because the doc may already be gone.
- * Exported for direct invocation in tests (fake-timer control).
+ * Exported so index.ts can route the OFFSCREEN_IDLE_ALARM alarm to it.
  */
 export async function teardownIfIdle(): Promise<void> {
   if (pending > 0) return // D-05: never tear down mid-inference (T-05-01)
@@ -186,7 +196,7 @@ export async function teardownIfIdle(): Promise<void> {
 /**
  * Ensure the Offscreen Document is alive before sending CLASSIFY_BATCH messages.
  * Uses chrome.runtime.getContexts() check + promise guard (Pitfall 2 / T-03-09).
- * Exported so index.ts can call it at SW startup.
+ * Never called at SW boot (D-01 recreate-on-demand): classifyBatch calls it only for a burst.
  */
 export async function ensureOffscreen(): Promise<void> {
   const offscreenUrl = chrome.runtime.getURL('src/offscreen/index.html')
@@ -213,6 +223,9 @@ export async function ensureOffscreen(): Promise<void> {
   creatingOffscreen = creation
   try {
     await creation
+    // Schedule teardown from the document's birth, even if the SW dies before the burst's
+    // finally runs (G-05-1). Not armed on the early return where the document already exists.
+    await armIdleTeardown()
   } finally {
     // Always clear — a failed attempt must not poison subsequent calls (CR-01).
     // A rejected promise left cached here would wedge every later ensureOffscreen()
@@ -275,7 +288,7 @@ export async function classifyBatch(
         })) as { results?: Array<{ tabId: number; label: TabVitality | null; confidence: number }> } | undefined
       } finally {
         pending--
-        armIdleTeardown() // D-01: re-arm idle timer after each burst; resets the window
+        await armIdleTeardown() // D-01: re-schedule the alarm after each burst; resets the window
       }
 
       // WR-01: validate the response shape before iterating (sendMessage can resolve undefined).

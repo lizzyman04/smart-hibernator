@@ -4,10 +4,10 @@
 import { handleAlarmTick, handleManualHibernate } from './hibernation'
 import { createContextMenus } from './contextMenus'
 import { ensureHibernateAlarm } from './alarms'
-import { ALARM_NAME, AI_CONFIDENCE_THRESHOLD, AI_WAKE_SIGNAL_WINDOW_MS } from '../shared/constants'
+import { ALARM_NAME, OFFSCREEN_IDLE_ALARM, AI_CONFIDENCE_THRESHOLD, AI_WAKE_SIGNAL_WINDOW_MS } from '../shared/constants'
 import { captureAndStore } from './thumbnail'
 import { deleteThumbnail, putTabState, getTabState, deleteTabState } from './idb'
-import { ensureOffscreen } from './classifier'
+import { teardownIfIdle } from './classifier'
 import { recordKeepAlive, recordTabActivation, closeTabVisit, recordWakeMisclassification } from './ai-learning'
 import type { ClassificationResult, TabStateSnapshot, FieldSnapshot } from '../shared/types'
 
@@ -16,10 +16,9 @@ import type { ClassificationResult, TabStateSnapshot, FieldSnapshot } from '../s
 // silently stopping if the alarm is ever cleared (RESEARCH.md Pitfall 1).
 ensureHibernateAlarm()
 
-// Phase 3: Warm up the Offscreen Document on every SW boot so the first alarm tick
-// finds an already-initialized ORT session. Idempotent — ensureOffscreen() checks
-// chrome.runtime.getContexts() before creating (T-03-09 promise guard).
-ensureOffscreen().catch((err) => console.error('[smart-hibernator] offscreen init failed', err))
+// D-01 recreate-on-demand: the Offscreen Document is NOT created at SW boot. classifyBatch
+// creates it only when a burst actually needs inference. A boot-time create would undo every
+// idle teardown, because the SW restarts after idling out (G-05-1).
 
 // Phase 3: Track the currently-active tabId per window so we can close the prior
 // visit window when a new tab becomes active. Module-level to survive across events.
@@ -66,6 +65,9 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_NAME) {
     handleAlarmTick().catch((err) => console.error('[smart-hibernator] alarm tick failed', err))
+  } else if (alarm.name === OFFSCREEN_IDLE_ALARM) {
+    // G-05-1: one-shot idle teardown; survives SW suspension. teardownIfIdle no-ops mid-burst.
+    teardownIfIdle().catch((err) => console.error('[smart-hibernator] offscreen idle teardown failed', err))
   }
 })
 
