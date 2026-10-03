@@ -79,7 +79,7 @@ Plans:
   1. Total extension memory footprint stays below 45MB even with multiple models loaded.
   2. UI is fully responsive and consistent across Windows, macOS, and Linux.
   3. All extension permissions are verified as the absolute minimum required for functionality.
-**Plans**: 5 plans
+**Plans**: 6 plans
 
 Plans:
 - [x] 05-01-PLAN.md — Wave 1: Offscreen idle-teardown lifecycle + in-flight guard + dev mem probe (D-01/D-05/D-02 probe) — NFR-01 lever
@@ -87,6 +87,7 @@ Plans:
 - [x] 05-03-PLAN.md — Wave 1: Permissions trim + manifest polish + PERMISSIONS.md + packaging zip (D-03/D-04/D-09)
 - [x] 05-04-PLAN.md — Wave 1: Cross-OS CSS normalization (scrollbars + fonts) in popup/dashboard (D-13 fix)
 - [x] 05-05-PLAN.md — Wave 2: Launch docs (PRIVACY/runbook/screenshots/listing/README) + manual NFR-01 RAM gate + per-OS screenshot gate (D-10/D-11/D-12/D-02/D-13)
+- [ ] 05-06-PLAN.md — Wave 3 (gap closure G-05-1): confirm root cause via RED regression, freshness-gated classification, chrome.alarms-scheduled offscreen teardown, no boot warm-up, runbook update (D-01/D-05/D-02)
 **UI hint**: yes
 
 ## Progress Table
