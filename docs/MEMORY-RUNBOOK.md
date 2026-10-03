@@ -19,6 +19,16 @@
 - **Chrome 120+** (or Edge Chromium)
 - **Clean build** — run `npm run build` first (or `npm run package` which includes a build step). Do not load a stale `dist/` from a prior session.
 - The extension loaded **unpacked** from the `dist/` folder (developer mode) or from a freshly produced zip loaded unpacked.
+- **Past AI cold start.** The AI only classifies once `AI_COLD_START_MIN_SAMPLES` (50) tab-history rows exist. On a fresh profile no classification runs and, since the G-05-1 fix, **no offscreen document is ever created**, so the "warm" reading would be meaningless (there is nothing to tear down). Either use a profile with real browsing already recorded by the extension, or seed at least 50 rows from the service-worker DevTools console (`chrome://extensions` → Smart Hibernator → Inspect views → service worker → Console):
+
+  ```js
+  // Seed 60 tab-history rows across ~10 domains, one hour apart (modeled on uat-evidence/nfr01-run.mjs)
+  const db = await new Promise((res, rej) => { const r = indexedDB.open('smart-hibernator'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error) })
+  const doms = ['github.com','wikipedia.org','python.org','nodejs.org','bbc.com','example.com','npmjs.com','gnu.org','kernel.org','archive.org']
+  const tx = db.transaction('tab-history', 'readwrite'); const st = tx.objectStore('tab-history'); const now = Date.now()
+  for (let i = 0; i < 60; i++) { const d = doms[i % doms.length]; st.add({ domain: d, url: 'https://' + d + '/', visitStart: now - i * 3600e3, visitEnd: now - i * 3600e3 + 120e3, dwellMs: 120e3, hadFormActivity: false, timestamp: now - i * 3600e3 }) }
+  await new Promise(r => tx.oncomplete = r); db.close()
+  ```
 
 ---
 
@@ -38,7 +48,7 @@
    - Suggested mix: news sites, GitHub repos, documentation pages, social media, YouTube, search results.
    - 50 tabs is the minimum for a meaningful warm-path reading. 80–100 tabs better represent the target user.
 2. Wait for all tabs to finish loading (no loading spinners).
-3. Let the extension classify — the alarm fires every **1 minute**, so allow at least 2–3 minutes for the first classification burst to complete.
+3. Let the extension classify — the alarm fires every **1 minute**, so allow at least 2–3 minutes for the first classification burst to complete. The first burst happens on the first alarm tick after the cold-start threshold is met. Later ticks do **not** re-classify unless something changes: a tab activation, form input, a Keep Alive or wake-signal bias change, a hostname change, or the 60-minute `AI_CLASSIFICATION_TTL_MS` refresh.
 
 ### Step 3 — Take the "warm" reading
 
@@ -61,10 +71,11 @@
 
 ### Step 4 — Wait for the idle window
 
-1. Stop all activity: do not switch tabs, do not open new URLs, do not interact with the extension.
-2. The `OFFSCREEN_IDLE_MS` constant is **10 minutes** (`src/shared/constants.ts`). After the last classification burst, the idle timer arms; it fires and tears down the offscreen document **10 minutes later** (if no new classification burst fires first).
-3. Wait **at least 12 minutes** from your last browser interaction (2 minutes of buffer above the 10-minute idle window) to ensure the timer has fired.
-4. Optional: watch `chrome://extensions` → Smart Hibernator → "Inspect views" — the offscreen view should disappear from the list when the document is torn down.
+1. Stop all activity: do not switch tabs, do not open new URLs, do not interact with the extension. A single tab switch counts as activity: the previously active tab becomes a stale candidate, triggers a new classification burst on the next tick, and restarts the 10-minute window.
+2. The `OFFSCREEN_IDLE_MS` constant is **10 minutes** (`src/shared/constants.ts`). Teardown is a one-shot `chrome.alarms` alarm named `OFFSCREEN_IDLE_TEARDOWN`. It is re-scheduled to now + 10 min at the end of every classification burst and when the document is created, and it survives service-worker suspension. When it fires, `teardownIfIdle()` closes the document (unless a burst is in flight).
+3. Wait **at least 12 minutes** from your last browser interaction (2 minutes of buffer above the 10-minute idle window) to ensure the alarm has fired.
+4. Tip: in the service-worker console, `await chrome.alarms.get('OFFSCREEN_IDLE_TEARDOWN')` shows `scheduledTime`, which should stop moving once the browser is idle.
+5. Optional: watch `chrome://extensions` → Smart Hibernator → "Inspect views" — the offscreen view should disappear from the list when the document is torn down.
 
 ### Step 5 — Take the "idle" reading (the gate)
 
@@ -84,10 +95,11 @@
 
 ### Step 6 — Verify cold-start recreation (optional but recommended)
 
-1. After the idle reading, switch to one of the open tabs to trigger the next alarm tick (or wait up to 1 minute for the next alarm).
-2. Within 1 alarm period (1 minute), re-open Task Manager.
+1. After the idle reading, switch to a **different** tab. The recreation trigger is that tab activation: the previously active tab becomes stale and the next alarm tick runs a classification burst.
+2. Wait up to one alarm period (1 minute), then re-open Task Manager.
 3. Confirm the **Offscreen Document process reappears** — the idle-teardown recreation path is working (`ensureOffscreen()` in `classifier.ts` transparently recreates the document on the next `classifyBatch()` call).
-4. Confirm there are **no console errors** in the Service Worker (`chrome://extensions` → Smart Hibernator → Inspect views → service worker):
+4. Expected long-idle pattern: with no activity at all, the document is recreated about once per `AI_CLASSIFICATION_TTL_MS` (60 min) for a refresh burst and torn down 10 minutes later.
+5. Confirm there are **no console errors** in the Service Worker (`chrome://extensions` → Smart Hibernator → Inspect views → service worker):
    - Look for: `Error creating offscreen document`, `sendMessage port closed`, or `session init failed`.
    - None of these should appear.
 
@@ -126,11 +138,12 @@ Console errors on recreation: NONE ✓ / PRESENT ✗ (describe: ___)
 
 | Symptom | Likely cause | Where to look |
 |---------|-------------|---------------|
-| Offscreen document still present after 12+ min idle | Idle timer not firing, or `pending` ref-count stuck > 0 | `teardownIfIdle()` in `classifier.ts`; check `pending` counter |
+| Offscreen document still present after 12+ min idle | Teardown alarm not scheduled or not firing, or `pending` ref-count stuck > 0 | `await chrome.alarms.get('OFFSCREEN_IDLE_TEARDOWN')` in the SW console; `armIdleTeardown()` / `teardownIfIdle()` in `classifier.ts`; the `OFFSCREEN_IDLE_TEARDOWN` branch in `index.ts` |
 | Total RSS ≥ 45 MB even with offscreen absent | SW holding large data structures | `idb.ts` thumbnail store size; `chrome.storage.local` cache size |
 | Offscreen document present and RSS ≥ 45 MB | Teardown not working at all | `armIdleTeardown()` in `classifier.ts`; confirm `OFFSCREEN_IDLE_MS` constant |
 | Recreation fails (console errors) | `ensureOffscreen()` or `getContexts()` error | `classifier.ts` `ensureOffscreen()` try/catch; Chrome 120 offscreen API compat |
-| Offscreen document disappears but reappears immediately | `pending` guard not holding teardown long enough, or alarm firing before idle window elapses | Confirm `OFFSCREEN_IDLE_MS` (10 min) > alarm period (1 min) |
+| Document reappears every minute | Something marks classifications stale every tick, or something creates the document at SW boot | Inspect `isClassificationStale` inputs (`tab_meta` `lastActiveAt` churn, `featureKey`) in `classifier.ts`; `index.ts` must not call `ensureOffscreen()` at boot |
+| Offscreen document disappears mid-classification | `pending` guard not spanning `ensureOffscreen()` plus the `CLASSIFY_BATCH` round-trip | `pending++` / `finally { pending-- }` in `classifyBatch` (`classifier.ts`) |
 
 ---
 
@@ -147,4 +160,4 @@ The probe is supplementary visibility only: if it does happen to be available in
 
 ---
 
-*Runbook version: 1.0 — reflects Smart Hibernator v1.0.1 (OFFSCREEN_IDLE_MS = 10 min, alarm period = 1 min, NFR-01 threshold = 45 MB).*
+*Runbook version: 1.1 — reflects Smart Hibernator v1.0.1 with the G-05-1 fix (OFFSCREEN_IDLE_MS = 10 min via the `OFFSCREEN_IDLE_TEARDOWN` alarm, AI_CLASSIFICATION_TTL_MS = 60 min, alarm period = 1 min, NFR-01 threshold = 45 MB).*

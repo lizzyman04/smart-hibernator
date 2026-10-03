@@ -149,7 +149,7 @@ When CWS prompts you to justify each permission, use these one-liners:
 |------------|-------------------|
 | `storage` | Persists hibernation settings, allowlists, stats, and AI classification cache across sessions. |
 | `tabs` | Queries tab metadata (URL, activity) and invokes the native tab discard API for hibernation. |
-| `alarms` | Drives the recurring 1-minute hibernation check loop. |
+| `alarms` | Drives the recurring 1-minute hibernation check loop. Also schedules a one-shot alarm that closes the AI offscreen document after 10 idle minutes, so its memory is released even while the service worker is suspended. |
 | `contextMenus` | Adds a right-click "Hibernate this tab" item for manual hibernation. |
 | `activeTab` | Captures visible-tab thumbnails (WebP) for the hibernated-tabs preview list. |
 | `offscreen` | Runs the ONNX Runtime Web AI classifier in an isolated offscreen context. |
