@@ -16,7 +16,13 @@ export type TabVitality = 'Vital' | 'Semi-Active' | 'Dead'
 export interface ClassificationResult {
   label: TabVitality | null
   confidence: number
+  /** Last alarm tick at which this entry was confirmed current for a candidate tab;
+   * consumed by the index.ts onUpdated wake-misclassification window. */
   cachedAt: number
+  /** Unix ms of the ONNX inference that produced label/confidence (G-05-1). */
+  inferredAt?: number
+  /** Event-driven feature signature at inference time (G-05-1). */
+  featureKey?: string
 }
 
 export interface TabHistoryRecord {

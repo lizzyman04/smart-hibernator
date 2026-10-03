@@ -46,6 +46,17 @@ export const DEAD_DOMAINS: readonly string[] = []
  * never tears down between ticks. Only fires when genuinely idle (Pitfall 1). */
 export const OFFSCREEN_IDLE_MS = 10 * 60 * 1000
 
+/** G-05-1: Upper bound on how long a cached classification is reused without fresh inference.
+ * Covers slow drift (recency, 14-day history aging, sibling-tab visits). It MUST exceed
+ * OFFSCREEN_IDLE_MS so an idle browser reaches teardown and stays down; during long idle the
+ * document lives roughly OFFSCREEN_IDLE_MS per TTL. Claude's discretion under D-01
+ * (RAM saved vs cold-start frequency). */
+export const AI_CLASSIFICATION_TTL_MS = 60 * 60 * 1000
+
+/** G-05-1: Name of the one-shot chrome.alarms alarm that schedules the offscreen idle teardown.
+ * Alarms persist across service-worker suspension, unlike an in-memory setTimeout. */
+export const OFFSCREEN_IDLE_ALARM = 'OFFSCREEN_IDLE_TEARDOWN' as const
+
 // Phase 4 — State Restoration constants
 
 /** D-01: scroll/input debounce interval before sending SAVE_STATE to SW */

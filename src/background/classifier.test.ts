@@ -4,6 +4,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   AI_COLD_START_MIN_SAMPLES,
   AI_CONFIDENCE_THRESHOLD,
+  AI_CLASSIFICATION_TTL_MS,
+  OFFSCREEN_IDLE_MS,
+  OFFSCREEN_IDLE_ALARM,
+  ALARM_NAME,
 } from '../shared/constants'
 
 // Mock idb module so tests control what history and bias values are returned
@@ -15,13 +19,15 @@ vi.mock('./idb', () => ({
 
 import {
   buildFeaturesForTab,
+  classificationFeatureKey,
   classifyBatch,
+  isClassificationStale,
   ensureOffscreen,
   getDomainCategoryBoost,
   teardownIfIdle,
 } from './classifier'
 import { countTabHistory, getTabHistoryByDomain, getDomainBias } from './idb'
-import type { TabMeta, TabHistoryRecord } from '../shared/types'
+import type { TabMeta, TabHistoryRecord, ClassificationResult } from '../shared/types'
 
 // ─── Test data helpers ──────────────────────────────────────────────────────
 
@@ -436,5 +442,190 @@ describe('D-01 / D-05: teardownIfIdle + pending ref-count guard', () => {
     await classifyBatch([{ tabId: 1, url: 'https://example.com', meta: makeMeta() }])
 
     expect(chrome.offscreen.createDocument).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// G-05-1: classification freshness gate
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('G-05-1 constants', () => {
+  it('AI_CLASSIFICATION_TTL_MS exceeds OFFSCREEN_IDLE_MS so an idle browser can reach teardown', () => {
+    expect(AI_CLASSIFICATION_TTL_MS).toBeGreaterThan(OFFSCREEN_IDLE_MS)
+  })
+
+  it('OFFSCREEN_IDLE_ALARM is a non-empty string distinct from ALARM_NAME', () => {
+    expect(typeof OFFSCREEN_IDLE_ALARM).toBe('string')
+    expect(OFFSCREEN_IDLE_ALARM.length).toBeGreaterThan(0)
+    expect(OFFSCREEN_IDLE_ALARM).not.toBe(ALARM_NAME)
+  })
+})
+
+describe('classificationFeatureKey (G-05-1)', () => {
+  const base = [0.1, 0.2, 0, 1, 0.5, 0.3]
+
+  it('changes when the hostname changes', () => {
+    expect(classificationFeatureKey('https://a.example/', base)).not.toBe(
+      classificationFeatureKey('https://b.example/', base)
+    )
+  })
+
+  it('changes when features[2], [3] or [4] (3 dp) change', () => {
+    const k = classificationFeatureKey('https://a.example/', base)
+    expect(classificationFeatureKey('https://a.example/', [0.1, 0.2, 1, 1, 0.5, 0.3])).not.toBe(k)
+    expect(classificationFeatureKey('https://a.example/', [0.1, 0.2, 0, -1, 0.5, 0.3])).not.toBe(k)
+    expect(classificationFeatureKey('https://a.example/', [0.1, 0.2, 0, 1, 0.501, 0.3])).not.toBe(k)
+  })
+
+  it('is unchanged when only drifting features [0], [1] or [5] change', () => {
+    const k = classificationFeatureKey('https://a.example/', base)
+    expect(classificationFeatureKey('https://a.example/', [0.9, 0.2, 0, 1, 0.5, 0.3])).toBe(k)
+    expect(classificationFeatureKey('https://a.example/', [0.1, 0.9, 0, 1, 0.5, 0.3])).toBe(k)
+    expect(classificationFeatureKey('https://a.example/', [0.1, 0.2, 0, 1, 0.5, 0.9])).toBe(k)
+  })
+
+  it('uses an empty hostname for an invalid URL', () => {
+    expect(classificationFeatureKey('not a url', base).startsWith('|')).toBe(true)
+  })
+})
+
+describe('isClassificationStale (G-05-1)', () => {
+  const now = 10_000_000_000
+  const key = 'a.example|0|0|0.000'
+  const fresh: ClassificationResult = {
+    label: 'Dead',
+    confidence: 0.9,
+    cachedAt: now - 1000,
+    inferredAt: now - 1000,
+    featureKey: key,
+  }
+  const meta: TabMeta = { lastActiveAt: now - 5000 }
+
+  it('is true for an undefined entry', () => {
+    expect(isClassificationStale(undefined, key, meta, now)).toBe(true)
+  })
+
+  it('is true when inferredAt is missing, non-finite, or in the future', () => {
+    expect(isClassificationStale({ ...fresh, inferredAt: undefined }, key, meta, now)).toBe(true)
+    expect(isClassificationStale({ ...fresh, inferredAt: NaN }, key, meta, now)).toBe(true)
+    expect(isClassificationStale({ ...fresh, inferredAt: Infinity }, key, meta, now)).toBe(true)
+    expect(isClassificationStale({ ...fresh, inferredAt: now + 1 }, key, meta, now)).toBe(true)
+  })
+
+  it('is false at TTL - 1 and true at exactly TTL', () => {
+    expect(
+      isClassificationStale({ ...fresh, inferredAt: now - (AI_CLASSIFICATION_TTL_MS - 1) }, key, { lastActiveAt: 0 }, now)
+    ).toBe(false)
+    expect(
+      isClassificationStale({ ...fresh, inferredAt: now - AI_CLASSIFICATION_TTL_MS }, key, { lastActiveAt: 0 }, now)
+    ).toBe(true)
+  })
+
+  it('is true when lastActiveAt is later than inferredAt, false when equal', () => {
+    expect(isClassificationStale(fresh, key, { lastActiveAt: fresh.inferredAt! + 1 }, now)).toBe(true)
+    expect(isClassificationStale(fresh, key, { lastActiveAt: fresh.inferredAt! }, now)).toBe(false)
+  })
+
+  it('is true when featureKey differs or is missing', () => {
+    expect(isClassificationStale(fresh, 'other', meta, now)).toBe(true)
+    expect(isClassificationStale({ ...fresh, featureKey: undefined }, key, meta, now)).toBe(true)
+  })
+
+  it('is false when everything is fresh', () => {
+    expect(isClassificationStale(fresh, key, meta, now)).toBe(false)
+  })
+})
+
+describe('classifyBatch freshness gate (G-05-1)', () => {
+  const NOW = 1_800_000_000_000
+  const url = 'https://example.com'
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+    vi.clearAllMocks()
+    vi.mocked(chrome.runtime.getContexts).mockResolvedValue([])
+    vi.mocked(chrome.offscreen.createDocument).mockResolvedValue(undefined)
+    vi.mocked(chrome.offscreen.closeDocument).mockResolvedValue(undefined)
+    vi.mocked(countTabHistory).mockResolvedValue(100)
+    vi.mocked(getTabHistoryByDomain).mockResolvedValue([makeHistoryRow({ domain: 'example.com' })])
+    vi.mocked(getDomainBias).mockResolvedValue(undefined)
+    vi.mocked(chrome.storage.local.set).mockResolvedValue(undefined)
+    vi.mocked(chrome.tabs.query).mockResolvedValue([
+      { id: 1 } as chrome.tabs.Tab,
+      { id: 2 } as chrome.tabs.Tab,
+    ])
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('fully fresh cache: no sendMessage / getContexts / createDocument; only cachedAt refreshed', async () => {
+    const meta: TabMeta = { lastActiveAt: NOW - 10 * 60_000 }
+    const features = await buildFeaturesForTab(1, url, meta)
+    const featureKey = classificationFeatureKey(url, features!)
+    const inferredAt = NOW - 5 * 60_000
+    vi.mocked(chrome.storage.local.get).mockResolvedValue({
+      ai_classifications: {
+        1: { label: 'Dead', confidence: 0.8, cachedAt: inferredAt, inferredAt, featureKey },
+      },
+    })
+
+    await classifyBatch([{ tabId: 1, url, meta }])
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
+    expect(chrome.runtime.getContexts).not.toHaveBeenCalled()
+    expect(chrome.offscreen.createDocument).not.toHaveBeenCalled()
+    expect(chrome.storage.local.set).toHaveBeenCalledTimes(1)
+    const written = (vi.mocked(chrome.storage.local.set).mock.calls[0][0] as any).ai_classifications
+    expect(written[1]).toEqual({ label: 'Dead', confidence: 0.8, cachedAt: NOW, inferredAt, featureKey })
+  })
+
+  it('one stale + one fresh candidate: one CLASSIFY_BATCH with both tabIds, both get inferredAt = now', async () => {
+    const meta: TabMeta = { lastActiveAt: NOW - 10 * 60_000 }
+    const features = await buildFeaturesForTab(1, url, meta)
+    const featureKey = classificationFeatureKey(url, features!)
+    const inferredAt = NOW - 5 * 60_000
+    vi.mocked(chrome.storage.local.get).mockResolvedValue({
+      ai_classifications: {
+        1: { label: 'Dead', confidence: 0.8, cachedAt: inferredAt, inferredAt, featureKey },
+        // tab 2 has no entry -> stale
+      },
+    })
+    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({
+      results: [
+        { tabId: 1, label: 'Vital', confidence: 0.9 },
+        { tabId: 2, label: 'Dead', confidence: 0.9 },
+      ],
+    })
+
+    await classifyBatch([
+      { tabId: 1, url, meta },
+      { tabId: 2, url, meta },
+    ])
+
+    const sends = vi.mocked(chrome.runtime.sendMessage).mock.calls.filter(
+      (c) => (c[0] as any).type === 'CLASSIFY_BATCH'
+    )
+    expect(sends).toHaveLength(1)
+    expect((sends[0][0] as any).tabs.map((t: any) => t.tabId).sort()).toEqual([1, 2])
+    const written = (vi.mocked(chrome.storage.local.set).mock.calls[0][0] as any).ai_classifications
+    for (const id of [1, 2]) {
+      expect(written[id].inferredAt).toBe(NOW)
+      expect(written[id].cachedAt).toBe(NOW)
+      expect(typeof written[id].featureKey).toBe('string')
+    }
+  })
+
+  it('cold start: no getContexts / createDocument / sendMessage', async () => {
+    vi.mocked(countTabHistory).mockResolvedValue(5)
+    vi.mocked(chrome.storage.local.get).mockResolvedValue({ ai_classifications: {} })
+
+    await classifyBatch([{ tabId: 1, url, meta: { lastActiveAt: NOW } }])
+
+    expect(chrome.runtime.getContexts).not.toHaveBeenCalled()
+    expect(chrome.offscreen.createDocument).not.toHaveBeenCalled()
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled()
   })
 })

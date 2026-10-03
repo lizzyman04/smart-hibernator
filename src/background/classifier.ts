@@ -2,6 +2,9 @@
 // Analog: src/background/thumbnail.ts (same service utility role in SW context).
 // Per RESEARCH.md Patterns 1, 3, 6; Pitfalls 2 and 5; D-02, D-07, D-11, T-03-06/07/09.
 // Phase 5: D-01/D-05 idle teardown + pending ref-count guard (Pattern 1).
+// G-05-1: freshness gate — classifyBatch only runs inference (and only creates the offscreen
+// document) when at least one candidate's cached classification is stale, so an idle browser
+// stops re-arming the idle teardown every alarm tick.
 import { getTabHistoryByDomain, getDomainBias, countTabHistory } from './idb'
 import {
   AI_COLD_START_MIN_SAMPLES,
@@ -9,6 +12,7 @@ import {
   VITAL_DOMAINS,
   DEAD_DOMAINS,
   OFFSCREEN_IDLE_MS,
+  AI_CLASSIFICATION_TTL_MS,
 } from '../shared/constants'
 import type { ClassificationResult, TabMeta, TabVitality } from '../shared/types'
 
@@ -89,6 +93,46 @@ export async function buildFeaturesForTab(
     // Invalid URL or IDB failure — silently return null (same pattern as thumbnail.ts compressToWebP)
     return null
   }
+}
+
+// ─── Classification freshness gate (G-05-1) ─────────────────────────────────
+
+/**
+ * Signature of the EVENT-DRIVEN inputs to a classification: hostname, form activity (f2),
+ * domain category boost (f3) and learned domain bias (f4, 3 decimals).
+ * The drifting features (0 revisitFreq, 1 dwellTime, 5 recency) are deliberately excluded:
+ * they change during idle via time and history aging, and including them would recreate the
+ * per-tick bursts this gate removes. Their drift is bounded by AI_CLASSIFICATION_TTL_MS.
+ */
+export function classificationFeatureKey(url: string, features: number[]): string {
+  let hostname = ''
+  try {
+    hostname = new URL(url).hostname
+  } catch {
+    hostname = ''
+  }
+  return [hostname, features[2], features[3], features[4].toFixed(3)].join('|')
+}
+
+/**
+ * True when a cached classification must be re-inferred. Missing, non-finite or future
+ * inferredAt, a missing/different featureKey, a tab activation after inference, or TTL expiry
+ * all count as stale (T-05-06-03).
+ */
+export function isClassificationStale(
+  entry: ClassificationResult | undefined,
+  featureKey: string,
+  meta: TabMeta,
+  now: number
+): boolean {
+  if (!entry) return true
+  const inferredAt = entry.inferredAt
+  if (typeof inferredAt !== 'number' || !Number.isFinite(inferredAt)) return true
+  if (inferredAt > now) return true
+  if (now - inferredAt >= AI_CLASSIFICATION_TTL_MS) return true
+  if (meta.lastActiveAt > inferredAt) return true
+  if (entry.featureKey !== featureKey) return true
+  return false
 }
 
 // ─── Offscreen Document lifecycle (RESEARCH Pattern 1 + Pitfall 2 / T-03-09) ─
@@ -183,6 +227,11 @@ export async function ensureOffscreen(): Promise<void> {
  * Classify a batch of candidate tabs, cache results in chrome.storage.local,
  * and prune stale tabIds from the cache (T-03-06 storage quota mitigation).
  *
+ * G-05-1 freshness gate: inference (and offscreen document creation) only happens when at
+ * least one candidate is stale (see isClassificationStale). A burst re-infers ALL kept
+ * candidates so inferredAt values stay aligned. On a fully fresh batch only cachedAt is
+ * refreshed (Phase 3 wake-misclassification window) and no offscreen work is done.
+ *
  * Silently no-ops on any error (same pattern as thumbnail.ts captureAndStore).
  */
 export async function classifyBatch(
@@ -191,51 +240,66 @@ export async function classifyBatch(
   if (candidateTabs.length === 0) return
 
   try {
-    // Ensure Offscreen Document is alive before sending the message
-    await ensureOffscreen()
-
-    // Build feature vectors for all candidates in parallel; filter out nulls (cold start)
-    const payloads = await Promise.all(
-      candidateTabs.map(async ({ tabId, url, meta }) => {
-        const features = await buildFeaturesForTab(tabId, url, meta)
-        return features ? { tabId, features } : null
-      })
-    )
-    const toClassify = payloads.filter(
-      (p): p is { tabId: number; features: number[] } => p !== null
-    )
-
-    if (toClassify.length === 0) return
-
-    // D-05: increment pending BEFORE sendMessage so teardownIfIdle cannot fire mid-inference.
-    // pending-- runs in finally so it decrements even when sendMessage throws (T-05-01).
-    pending++
-    let response: { results?: Array<{ tabId: number; label: TabVitality | null; confidence: number }> } | undefined
-    try {
-      response = (await chrome.runtime.sendMessage({
-        type: 'CLASSIFY_BATCH',
-        tabs: toClassify,
-      })) as { results?: Array<{ tabId: number; label: TabVitality | null; confidence: number }> } | undefined
-    } finally {
-      pending--
-      armIdleTeardown() // D-01: re-arm idle timer after each burst; resets the window
-    }
-
-    // WR-01: validate the response shape before iterating. sendMessage can resolve to
-    // undefined (no listener, channel closed, doc torn down mid-flight), in which case
-    // response.results would throw. Treat a missing/malformed result as an empty batch
-    // and skip rather than silently masking the wiring failure with a TypeError.
-    const results = Array.isArray(response?.results) ? response.results : []
-    if (results.length === 0) return
-
-    // IN-01: the cache read/prune/write below deliberately runs OUTSIDE the `pending`
-    // window (pending was already decremented in the finally above). This is correct:
-    // the `pending` guard only protects the offscreen inference round-trip; the cache
-    // write needs no offscreen doc, so it is safe for the idle timer to fire here.
-    // Read existing classification cache
+    // Read the cache once up front. classifyBatch is the sole writer of ai_classifications,
+    // so the longer read-modify-write window is safe.
     const current = await chrome.storage.local.get('ai_classifications')
     const cache =
       ((current['ai_classifications'] as Record<number, ClassificationResult>) ?? {})
+
+    // Build feature vectors for all candidates in parallel; filter out nulls (cold start).
+    // Cold start returns here, BEFORE any offscreen work, so it never creates the document.
+    const built = await Promise.all(
+      candidateTabs.map(async ({ tabId, url, meta }) => {
+        const features = await buildFeaturesForTab(tabId, url, meta)
+        return features
+          ? { tabId, features, meta, featureKey: classificationFeatureKey(url, features) }
+          : null
+      })
+    )
+    const kept = built.filter((p): p is NonNullable<typeof p> => p !== null)
+    if (kept.length === 0) return
+
+    const now = Date.now()
+    const burst = kept.some((k) => isClassificationStale(cache[k.tabId], k.featureKey, k.meta, now))
+
+    if (burst) {
+      // D-05: pending spans ensureOffscreen() AND the CLASSIFY_BATCH round-trip so
+      // teardownIfIdle cannot slip in between the create and the send (T-05-01).
+      pending++
+      let response: { results?: Array<{ tabId: number; label: TabVitality | null; confidence: number }> } | undefined
+      try {
+        await ensureOffscreen()
+        response = (await chrome.runtime.sendMessage({
+          type: 'CLASSIFY_BATCH',
+          tabs: kept.map(({ tabId, features }) => ({ tabId, features })),
+        })) as { results?: Array<{ tabId: number; label: TabVitality | null; confidence: number }> } | undefined
+      } finally {
+        pending--
+        armIdleTeardown() // D-01: re-arm idle timer after each burst; resets the window
+      }
+
+      // WR-01: validate the response shape before iterating (sendMessage can resolve undefined).
+      const results = Array.isArray(response?.results) ? response.results : []
+      if (results.length === 0) return
+
+      const keyByTab = new Map(kept.map((k) => [k.tabId, k.featureKey]))
+      for (const r of results) {
+        cache[r.tabId] = {
+          label: r.label,
+          confidence: r.confidence,
+          cachedAt: now,
+          inferredAt: now,
+          featureKey: keyByTab.get(r.tabId),
+        }
+      }
+    } else {
+      // Fully fresh: refresh cachedAt only (keeps the index.ts wake-misclassification window
+      // alive); no ensureOffscreen / sendMessage / armIdleTeardown.
+      for (const k of kept) {
+        const entry = cache[k.tabId]
+        if (entry) cache[k.tabId] = { ...entry, cachedAt: now }
+      }
+    }
 
     // Prune stale entries — remove tabIds no longer in current open tabs (T-03-06)
     const openTabs = await chrome.tabs.query({})
@@ -244,12 +308,6 @@ export async function classifyBatch(
       if (!openTabIds.has(Number(key))) {
         delete cache[Number(key)]
       }
-    }
-
-    // Write new classification results into cache
-    const now = Date.now()
-    for (const r of results) {
-      cache[r.tabId] = { label: r.label, confidence: r.confidence, cachedAt: now }
     }
 
     await chrome.storage.local.set({ ai_classifications: cache })
