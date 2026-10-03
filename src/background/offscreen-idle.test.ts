@@ -2,7 +2,8 @@
 // after 13 idle minutes with 49 tabs open).
 //
 // Drives the REAL handleAlarmTick (hibernation.ts) through the REAL classifyBatch
-// (classifier.ts) with stateful chrome fakes, across simulated idle minutes.
+// (classifier.ts) and the REAL index.ts alarm routing, with stateful chrome fakes, across
+// simulated idle minutes and simulated service-worker restarts.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { OFFSCREEN_IDLE_MS } from '../shared/constants'
 
@@ -19,9 +20,21 @@ vi.mock('./idb', () => ({
   getTabHistoryByDomain: getTabHistoryByDomainMock,
   getDomainBias: getDomainBiasMock,
   pruneTabHistory: pruneTabHistoryMock,
+  deleteThumbnail: vi.fn().mockResolvedValue(undefined),
+  putTabState: vi.fn().mockResolvedValue(undefined),
+  getTabState: vi.fn().mockResolvedValue(undefined),
+  deleteTabState: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { handleAlarmTick } from './hibernation'
+vi.mock('./thumbnail', () => ({ captureAndStore: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('./ai-learning', () => ({
+  recordKeepAlive: vi.fn().mockResolvedValue(undefined),
+  recordTabActivation: vi.fn(),
+  closeTabVisit: vi.fn().mockResolvedValue(undefined),
+  recordWakeMisclassification: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('./contextMenus', () => ({ createContextMenus: vi.fn() }))
+vi.mock('./alarms', () => ({ ensureHibernateAlarm: vi.fn().mockResolvedValue(undefined) }))
 
 const T0 = Date.UTC(2026, 0, 1, 12, 0, 0)
 const MINUTE = 60_000
@@ -31,6 +44,9 @@ let docOpen: boolean
 let createCalls: number[]
 let closeCalls: number[]
 let classifyBatchSends: number[][]
+// Alarms outlive a service-worker instance, so the scheduler lives outside module state.
+let alarmSchedule: Map<string, number>
+let currentTick: () => Promise<void>
 
 function backgroundTab(id: number): chrome.tabs.Tab {
   return {
@@ -110,12 +126,74 @@ function installFakes(): void {
     return undefined
   }) as never)
 
+  vi.mocked(chrome.alarms.create).mockImplementation(((
+    name: string,
+    info: { when?: number; delayInMinutes?: number }
+  ) => {
+    const when = info.when ?? Date.now() + (info.delayInMinutes ?? 0) * MINUTE
+    alarmSchedule.set(name, when)
+    return Promise.resolve()
+  }) as never)
+
   vi.mocked(chrome.tabs.query).mockImplementation((async () => tabs) as never)
   vi.mocked(chrome.tabs.discard).mockResolvedValue(undefined as never)
 }
 
+async function flushMicrotasks(): Promise<void> {
+  // Bounded loop; vi.waitFor is avoided because it advances fake time.
+  for (let i = 0; i < 20; i++) await Promise.resolve()
+}
+
+/** Fire every alarm whose time has come, through the real index.ts onAlarm listener. */
+async function fireDueAlarms(): Promise<void> {
+  for (const [name, when] of [...alarmSchedule.entries()]) {
+    if (when <= Date.now()) {
+      alarmSchedule.delete(name)
+      ;(chrome.alarms.onAlarm as unknown as { callListeners: (...a: unknown[]) => void }).callListeners({
+        name,
+        scheduledTime: when,
+      })
+    }
+  }
+  await flushMicrotasks()
+}
+
+function clearAllSwListeners(): void {
+  const events = [
+    chrome.runtime.onInstalled,
+    chrome.runtime.onMessage,
+    chrome.alarms.onAlarm,
+    chrome.tabs.onActivated,
+    chrome.tabs.onUpdated,
+    chrome.tabs.onRemoved,
+    chrome.contextMenus.onClicked,
+    chrome.commands.onCommand,
+  ]
+  for (const ev of events) (ev as unknown as { clearListeners: () => void }).clearListeners()
+}
+
+/** Boot a fresh service-worker instance: new module registry, index.ts evaluated. */
+async function bootSw(): Promise<void> {
+  clearAllSwListeners()
+  vi.resetModules()
+  await import('./index')
+  const hibernation = await import('./hibernation')
+  currentTick = hibernation.handleAlarmTick
+  await flushMicrotasks()
+}
+
+/** In-memory SW timers and listeners die with the SW; storage, alarms and the doc persist. */
+async function simulateSwRestart(): Promise<void> {
+  // clearAllTimers() also resets the fake clock to its install time, so restore it.
+  const now = Date.now()
+  vi.clearAllTimers()
+  vi.setSystemTime(now)
+  await bootSw()
+}
+
 async function tick(): Promise<void> {
-  await handleAlarmTick()
+  await currentTick()
+  await fireDueAlarms()
 }
 
 async function idleMinute(): Promise<void> {
@@ -136,7 +214,7 @@ function seedStore(): void {
   }
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.useFakeTimers()
   vi.setSystemTime(T0)
   vi.clearAllMocks()
@@ -145,6 +223,7 @@ beforeEach(() => {
   createCalls = []
   closeCalls = []
   classifyBatchSends = []
+  alarmSchedule = new Map()
   seedStore()
 
   countTabHistoryMock.mockResolvedValue(60)
@@ -163,6 +242,7 @@ beforeEach(() => {
   pruneTabHistoryMock.mockResolvedValue(undefined)
 
   installFakes()
+  await bootSw()
 })
 
 afterEach(() => {
@@ -215,5 +295,31 @@ describe('G-05-1: idle browser past cold start', () => {
       expect(cache[1].cachedAt).toBe(Date.now())
       expect(cache[1].inferredAt).toBe(T0)
     }
+  })
+})
+
+describe('G-05-1: service-worker lifetime', () => {
+  it('SW restart: teardown still happens, delivered by the persisted alarm', async () => {
+    await tick() // t0: burst in SW instance #1
+    await simulateSwRestart() // SW terminated and restarted; in-memory timers are gone
+    for (let i = 0; i < 11; i++) await idleMinute()
+
+    expect(closeCalls.length).toBe(1)
+    expect(closeCalls[0]).toBeLessThanOrEqual(T0 + OFFSCREEN_IDLE_MS + MINUTE)
+    expect(docOpen).toBe(false)
+  })
+
+  it('SW boot: importing index.ts never creates the offscreen document', async () => {
+    docOpen = false
+    createCalls = []
+    vi.mocked(chrome.runtime.getContexts).mockClear()
+    vi.mocked(chrome.offscreen.createDocument).mockClear()
+
+    await bootSw()
+
+    expect(createCalls.length).toBe(0)
+    expect(chrome.runtime.getContexts).not.toHaveBeenCalled()
+    expect(chrome.offscreen.createDocument).not.toHaveBeenCalled()
+    expect(createCalls.length).toBe(0)
   })
 })
