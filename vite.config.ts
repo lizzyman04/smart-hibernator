@@ -20,10 +20,13 @@ export default defineConfig({
         {
           src: 'node_modules/onnxruntime-web/dist/*.wasm',
           dest: 'ort',
+          // v4 keeps the src directory structure by default; ORT loads from ort/ directly
+          rename: { stripBase: true },
         },
         {
           src: 'node_modules/onnxruntime-web/dist/*.mjs',
           dest: 'ort',
+          rename: { stripBase: true },
         },
       ],
     }),

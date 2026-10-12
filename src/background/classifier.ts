@@ -292,8 +292,12 @@ export async function classifyBatch(
       }
 
       // WR-01: validate the response shape before iterating (sendMessage can resolve undefined).
-      const results = Array.isArray(response?.results) ? response.results : []
-      if (results.length === 0) return
+      // A whole-batch failure (offscreen session init error) yields no rows. Cache a null label
+      // per candidate, exactly like a per-tab inference error, so the freshness gate does not
+      // re-burst and re-arm the idle alarm every tick (G-05-1 failure mode).
+      const raw = Array.isArray(response?.results) ? response.results : []
+      const results =
+        raw.length > 0 ? raw : kept.map((k) => ({ tabId: k.tabId, label: null, confidence: 0 }))
 
       const keyByTab = new Map(kept.map((k) => [k.tabId, k.featureKey]))
       for (const r of results) {
