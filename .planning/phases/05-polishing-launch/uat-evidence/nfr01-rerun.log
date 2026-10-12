@@ -1,0 +1,12 @@
+ext id dpjijbdejkjakiamnecgniiemgkaggdd chrome 147.0.7727.15
+tabs 49
+seeded history rows: 60
+t+8.8m warm targets ["service_worker:service-worker-loader.js","background_page:src/offscreen/index.html"]
+WARM [{"pid":"725787","rssMB":120.3,"pssMB":18.6,"type":"renderer"}] ["service_worker:service-worker-loader.js","background_page:src/offscreen/index.html"]
+idle 3 m ["service_worker:service-worker-loader.js","background_page:src/offscreen/index.html"]
+idle 6 m ["service_worker:service-worker-loader.js","background_page:src/offscreen/index.html"]
+idle 9 m ["service_worker:service-worker-loader.js","background_page:src/offscreen/index.html"]
+idle 12 m ["service_worker:service-worker-loader.js","background_page:src/offscreen/index.html"]
+IDLE [{"pid":"725787","rssMB":128.8,"pssMB":24.2,"type":"renderer"}] ["service_worker:service-worker-loader.js","background_page:src/offscreen/index.html"]
+RECREATED [{"pid":"725787","rssMB":130.3,"pssMB":25.6,"type":"renderer"}] ["service_worker:service-worker-loader.js","background_page:src/offscreen/index.html"]
+BROWSER DISCONNECTED at 1723 s

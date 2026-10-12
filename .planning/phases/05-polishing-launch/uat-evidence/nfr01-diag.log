@@ -1,0 +1,32 @@
+PGLOG Loading the image 'data:image/svg+xml;utf8,<svg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'><path fill-rule='evenodd' clip-rule='evenodd' d='M14.76 13.27L
+PGLOG Connecting to 'https://ep1.adtrafficquality.google/getconfig/sodar?sv=200&tid=afs&tv=1234567890&st=env&sjk=c/W6a286Sc20TtqlU9gbVw==&sde=1' violates the following Content Security Policy directive: "de
+t+0.0m {"alarms":["HIBERNATE_CHECK@40s"],"n":0,"inferred":[],"labels":[],"off":0}
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+PGLOG Failed to load resource: the server responded with a status of 502 ()
+t+1.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+2.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+3.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+4.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+5.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+6.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+7.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+8.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+9.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+10.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+11.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+12.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+13.0m {"alarms":["HIBERNATE_CHECK@40s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
+t+14.0m {"alarms":["HIBERNATE_CHECK@39s","OFFSCREEN_IDLE_TEARDOWN@580s"],"n":0,"inferred":[],"labels":[],"off":1}
